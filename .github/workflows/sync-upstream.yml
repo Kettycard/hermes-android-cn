@@ -81,21 +81,20 @@ jobs:
     if: failure() && needs.sync.outputs.synced == 'conflict'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - name: Create conflict issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh issue create \
-            --title "上游同步冲突：需要手动合并" \
-            --body "自动合并 upstream/main 失败（上游改动与汉化文件重叠）。请在本地执行：
+          ISSUE_BODY: |
+            自动合并 upstream/main 失败（上游改动与汉化文件重叠）。
 
-\`\`\`bash
-git remote add upstream $UPSTREAM_REPO
-git fetch upstream main
-git merge upstream/main
-# 解决冲突后：git add -A && git commit && git push
-\`\`\`
+            请在本地执行：
 
-冲突解决注意：上游新增的英文文案需要按既有风格翻译为简体中文（术语表见 commit 880f676 的说明）。" \
-            || echo "issue already exists or failed"
+            ```bash
+            git remote add upstream https://github.com/rusty4444/hermes-android.git
+            git fetch upstream main
+            git merge upstream/main
+            # 解决冲突后：git add -A && git commit && git push
+            ```
+
+            冲突解决注意：上游新增的英文文案需要按既有风格翻译为简体中文（术语统一规则见 commit 880f676 的提交说明）。
+        run: gh issue create --title "上游同步冲突：需要手动合并" --body "$ISSUE_BODY" || echo "issue already exists or creation failed"
