@@ -641,7 +641,7 @@ class ProjectsRepository {
     if (_current.support == ProjectsSupport.unsupported) {
       throw const ProjectsUnsupportedException(
         'projects',
-        'This Hermes gateway does not support server-side projects',
+        '此 Hermes 网关不支持服务端项目',
       );
     }
   }

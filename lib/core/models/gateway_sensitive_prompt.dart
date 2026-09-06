@@ -30,10 +30,10 @@ class GatewaySensitivePromptRequest {
       return GatewaySensitivePromptRequest(
         kind: kind,
         requestId: requestId,
-        title: 'Administrator password needed',
+        title: '需要管理员密码',
         description:
-            'Hermes needs a sudo password for the pending terminal command.',
-        fieldLabel: 'Sudo password',
+            'Hermes 需要待执行终端命令的 sudo 密码。',
+        fieldLabel: 'Sudo 密码',
       );
     }
 
@@ -42,11 +42,11 @@ class GatewaySensitivePromptRequest {
     return GatewaySensitivePromptRequest(
       kind: kind,
       requestId: requestId,
-      title: envVar.isEmpty ? 'Secret needed' : envVar,
+      title: envVar.isEmpty ? '需要机密值' : envVar,
       description: prompt.isEmpty
-          ? 'Hermes needs a secret for the pending skill.'
+          ? 'Hermes 需要待执行技能的机密值。'
           : prompt,
-      fieldLabel: envVar.isEmpty ? 'Secret value' : envVar,
+      fieldLabel: envVar.isEmpty ? '机密值' : envVar,
     );
   }
 }

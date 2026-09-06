@@ -111,7 +111,7 @@ class _ConnectionCredentials {
       );
     } catch (_) {
       throw const CredentialStorageException(
-        'Stored connection credentials could not be read safely.',
+        '已存储的连接凭据无法被安全读取。',
       );
     }
   }
@@ -186,7 +186,7 @@ class ConnectionManager {
       rethrow;
     } catch (_) {
       throw const CredentialStorageException(
-        'Connection credentials could not be migrated safely.',
+        '无法安全地迁移连接凭据。',
       );
     }
   }
@@ -464,7 +464,7 @@ class ConnectionManager {
           .toList();
     } catch (_) {
       throw const CredentialStorageException(
-        'Saved connection metadata could not be read safely.',
+        '已保存的连接元数据无法被安全读取。',
       );
     }
   }
@@ -474,7 +474,7 @@ class ConnectionManager {
       return maps.map(SavedConnection.fromMap).toList();
     } catch (_) {
       throw const CredentialStorageException(
-        'Saved connection metadata could not be read safely.',
+        '已保存的连接元数据无法被安全读取。',
       );
     }
   }
@@ -507,7 +507,7 @@ class ConnectionManager {
         // platform errors because they may include sensitive storage details.
       }
       throw const CredentialStorageException(
-        'Connection credentials could not be saved safely.',
+        '无法安全地保存连接凭据。',
       );
     }
   }
@@ -522,7 +522,7 @@ class ConnectionManager {
       final readBack = await _credentialStore.read(key);
       if (readBack != null) {
         throw const CredentialStorageException(
-          'Connection credentials could not be cleared safely.',
+          '无法安全地清除连接凭据。',
         );
       }
       return;
@@ -533,7 +533,7 @@ class ConnectionManager {
     final readBack = await _credentialStore.read(key);
     if (readBack != encoded) {
       throw const CredentialStorageException(
-        'Connection credentials could not be verified safely.',
+        '无法安全地验证连接凭据。',
       );
     }
   }
@@ -546,14 +546,14 @@ class ConnectionManager {
       );
       if (!saved) {
         throw const CredentialStorageException(
-          'Connection metadata could not be saved safely.',
+          '无法安全地保存连接元数据。',
         );
       }
     } on CredentialStorageException {
       rethrow;
     } catch (_) {
       throw const CredentialStorageException(
-        'Connection metadata could not be saved safely.',
+        '无法安全地保存连接元数据。',
       );
     }
   }
@@ -590,17 +590,16 @@ class ApiHealthCheckResult {
     if (isHealthy) return '';
     if (statusCode == 401 || statusCode == 403) {
       return apiKeyProvided
-          ? 'API key was rejected by $endpoint (HTTP $statusCode).'
-          : 'Server requires an API key. Enter your API_SERVER_KEY.';
+          ? 'API 密钥被 $endpoint 拒绝（HTTP $statusCode）。'
+          : '服务器需要 API 密钥。请输入你的 API_SERVER_KEY。';
     }
     if (statusCode == 404) {
-      return 'Gateway endpoint $endpoint returned HTTP 404. Check the Gateway '
-          'path prefix and reverse-proxy routes.';
+      return '网关端点 $endpoint 返回 HTTP 404。请检查网关路径前缀与反向代理路由。';
     }
     if (statusCode case final code?) {
-      return 'Gateway endpoint $endpoint returned HTTP $code.';
+      return '网关端点 $endpoint 返回 HTTP $code。';
     }
-    return 'Cannot reach Gateway endpoint $endpoint.';
+    return '无法连接到网关端点 $endpoint。';
   }
 }
 

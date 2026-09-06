@@ -36,13 +36,13 @@ enum HomeSectionKind {
   String get title {
     switch (this) {
       case HomeSectionKind.needsYou:
-        return 'Needs you';
+        return '需要你处理';
       case HomeSectionKind.running:
-        return 'Running now';
+        return '正在运行';
       case HomeSectionKind.continueWorking:
-        return 'Continue working';
+        return '继续处理';
       case HomeSectionKind.completedRecently:
-        return 'Recently completed';
+        return '最近完成';
     }
   }
 }

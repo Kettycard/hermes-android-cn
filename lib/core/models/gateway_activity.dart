@@ -34,26 +34,26 @@ class GatewayToolActivity {
 
   String get displayName {
     final words = name.replaceAll(RegExp(r'[_-]+'), ' ').trim();
-    if (words.isEmpty) return 'Tool';
+    if (words.isEmpty) return '工具';
     return words[0].toUpperCase() + words.substring(1);
   }
 
   String get statusLabel {
     switch (phase) {
       case GatewayToolActivityPhase.running:
-        return 'Running';
+        return '运行中';
       case GatewayToolActivityPhase.generating:
-        return 'Preparing';
+        return '准备中';
       case GatewayToolActivityPhase.progress:
-        return 'Working';
+        return '处理中';
       case GatewayToolActivityPhase.completed:
         return durationSeconds == null
-            ? 'Completed'
-            : 'Completed in ${_formatDuration(durationSeconds!)}';
+            ? '已完成'
+            : '已完成，耗时 ${_formatDuration(durationSeconds!)}';
       case GatewayToolActivityPhase.failed:
         return durationSeconds == null
-            ? 'Failed'
-            : 'Failed after ${_formatDuration(durationSeconds!)}';
+            ? '失败'
+            : '失败，耗时 ${_formatDuration(durationSeconds!)}';
     }
   }
 
@@ -181,8 +181,8 @@ class GatewayToolActivity {
   }
 
   static String _formatDuration(double value) {
-    if (value < 1) return '${(value * 1000).round()} ms';
-    return '${value.toStringAsFixed(value < 10 ? 1 : 0)} s';
+    if (value < 1) return '${(value * 1000).round()} 毫秒';
+    return '${value.toStringAsFixed(value < 10 ? 1 : 0)} 秒';
   }
 }
 
@@ -214,9 +214,9 @@ class GatewayTurnStatus {
   static String? _fallbackText(String kind) {
     switch (kind) {
       case 'compacting':
-        return 'Compacting conversation context…';
+        return '正在压缩对话上下文…';
       case 'compacted':
-        return 'Conversation context compacted';
+        return '对话上下文已压缩';
       default:
         return null;
     }

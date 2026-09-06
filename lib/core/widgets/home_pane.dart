@@ -123,10 +123,9 @@ class HomePaneState extends State<HomePane> {
     if (sessions == null) {
       if (_error != null) {
         return ErrorState(
-          title: 'Could not reach Hermes',
+          title: '无法连接到 Hermes',
           message:
-              'Home needs your recent chats to know what deserves your '
-              'attention. Check that the gateway is reachable, then try again.',
+              '主页需要你最近的对话来判断哪些内容值得你关注。请确认网关可连接后重试。',
           onRetry: _load,
         );
       }
@@ -159,10 +158,9 @@ class HomePaneState extends State<HomePane> {
               ),
               child: const EmptyState(
                 icon: Icons.check_circle_outline,
-                title: 'Nothing needs you',
+                title: '没有需要你处理的事',
                 message:
-                    'No chat is blocked, running, or waiting to be resumed. '
-                    'Start a new one whenever you are ready.',
+                    '没有对话被阻塞、运行中或等待恢复。随时可以开始新的对话。',
               ),
             )
           else
@@ -213,7 +211,7 @@ class _OverflowNote extends StatelessWidget {
         HermesSpacing.lg,
       ),
       child: Text(
-        'and $count more',
+        '还有 $count 条',
         style: tokens.typography.label.copyWith(color: tokens.muted),
       ),
     );
@@ -243,7 +241,7 @@ class _OfflineBanner extends StatelessWidget {
             const SizedBox(width: HermesSpacing.sm),
             Expanded(
               child: Text(
-                'Offline — showing the last known activity.',
+                '已离线 — 显示最近一次已知的活动。',
                 style: tokens.typography.label.copyWith(color: tokens.muted),
               ),
             ),
@@ -264,7 +262,7 @@ class _HomeItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = HermesTokens.of(context);
     final title = item.session.title.trim().isEmpty
-        ? 'Untitled chat'
+        ? '未命名对话'
         : item.session.title;
     final project = item.projectName;
     final reason = item.attentionLabel;

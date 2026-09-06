@@ -96,7 +96,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              ElevatedButton(onPressed: _load, child: const Text('Retry')),
+              ElevatedButton(onPressed: _load, child: const Text('重试')),
             ],
           ),
         ),
@@ -110,7 +110,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
             Icon(Icons.extension_off, size: 48, color: Colors.grey[600]),
             const SizedBox(height: 16),
             Text(
-              'No skills found',
+              '未找到技能',
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ],

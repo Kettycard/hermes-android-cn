@@ -80,7 +80,7 @@ class GatewayClarifyRequest {
     return GatewayClarifyRequest(
       requestId: requestId,
       question: question.isEmpty
-          ? 'Hermes needs more information to continue.'
+          ? 'Hermes 需要更多信息才能继续。'
           : question,
       choices: choices,
       multiSelect: data['multi_select'] == true && choices.isNotEmpty,

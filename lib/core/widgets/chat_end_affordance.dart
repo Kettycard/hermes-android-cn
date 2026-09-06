@@ -17,15 +17,15 @@ class ChatEndAffordance extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasNewMessages = newMessageCount > 0;
-    final indicatorText = hasNewMessages ? '$newMessageCount new' : 'Latest';
+    final indicatorText = hasNewMessages ? '$newMessageCount 条新消息' : '最新';
     final semanticsValue = switch (newMessageCount) {
-      0 => 'No new messages',
-      1 => '1 new message',
-      _ => '$newMessageCount new messages',
+      0 => '没有新消息',
+      1 => '1 条新消息',
+      _ => '$newMessageCount 条新消息',
     };
 
     return Semantics(
-      label: 'Go to end',
+      label: '回到底部',
       value: semanticsValue,
       button: true,
       excludeSemantics: true,

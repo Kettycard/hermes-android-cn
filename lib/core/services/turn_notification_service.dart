@@ -213,7 +213,7 @@ class TurnNotificationService {
     await _sink.show(
       TurnNotification(
         id: notificationIdFor(turnId),
-        title: 'Hermes response ready',
+        title: 'Hermes 回复已就绪',
         body: turnSummary,
         payload: turnId,
         channel: turnChannel,

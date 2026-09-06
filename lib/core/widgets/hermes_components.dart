@@ -14,15 +14,15 @@ import '../theme/hermes_theme.dart';
 String defaultStatusLabel(HermesStatus status) {
   switch (status) {
     case HermesStatus.running:
-      return 'Running';
+      return '运行中';
     case HermesStatus.blocked:
-      return 'Needs you';
+      return '需要你处理';
     case HermesStatus.failed:
-      return 'Failed';
+      return '失败';
     case HermesStatus.completed:
-      return 'Done';
+      return '已完成';
     case HermesStatus.idle:
-      return 'Idle';
+      return '空闲';
   }
 }
 
@@ -288,7 +288,7 @@ class ErrorState extends StatelessWidget {
           ),
           if (onRetry != null) ...[
             const SizedBox(height: HermesSpacing.xl),
-            FilledButton.tonal(onPressed: onRetry, child: const Text('Retry')),
+            FilledButton.tonal(onPressed: onRetry, child: const Text('重试')),
           ],
         ],
       ),
@@ -333,7 +333,7 @@ class _LoadingSkeletonState extends State<LoadingSkeleton>
     final tokens = HermesTokens.of(context);
 
     return Semantics(
-      label: 'Loading',
+      label: '加载中',
       container: true,
       child: Column(
         children: List.generate(widget.rows, (index) {

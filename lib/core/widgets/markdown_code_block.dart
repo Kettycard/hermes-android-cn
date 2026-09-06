@@ -56,7 +56,7 @@ class _MarkdownCodeBlockState extends State<MarkdownCodeBlock> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
-          content: Text('Code copied'),
+          content: Text('代码已复制'),
           duration: Duration(seconds: 2),
         ),
       );
@@ -117,7 +117,7 @@ class _MarkdownCodeBlockState extends State<MarkdownCodeBlock> {
               children: [
                 Expanded(
                   child: Text(
-                    widget.language ?? 'code',
+                    widget.language ?? '代码',
                     style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 12,
@@ -130,7 +130,7 @@ class _MarkdownCodeBlockState extends State<MarkdownCodeBlock> {
                 ),
                 if (_wrap)
                   Tooltip(
-                    message: 'Scroll horizontally',
+                    message: '横向滚动',
                     child: IconButton(
                       icon: const Icon(Icons.swap_horiz, size: 18),
                       onPressed: () => setState(() => _wrap = false),
@@ -141,7 +141,7 @@ class _MarkdownCodeBlockState extends State<MarkdownCodeBlock> {
                     ),
                   ),
                 Tooltip(
-                  message: 'Wrap lines',
+                  message: '自动换行',
                   child: IconButton(
                     icon: const Icon(Icons.wrap_text, size: 18),
                     onPressed: () => setState(() => _wrap = true),
@@ -152,7 +152,7 @@ class _MarkdownCodeBlockState extends State<MarkdownCodeBlock> {
                   ),
                 ),
                 Tooltip(
-                  message: 'Copy code',
+                  message: '复制代码',
                   child: IconButton(
                     icon: const Icon(Icons.copy_outlined, size: 18),
                     onPressed: _copy,

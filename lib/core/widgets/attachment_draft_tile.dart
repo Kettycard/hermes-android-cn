@@ -30,7 +30,7 @@ class AttachmentDraftTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
-      label: 'Attachment ${index + 1} of $total',
+      label: '附件 ${index + 1}，共 $total 个',
       value: _statusLabel(),
       child: ListTile(
         minVerticalPadding: 4,
@@ -41,7 +41,7 @@ class AttachmentDraftTile extends StatelessWidget {
         subtitle: ExcludeSemantics(
           child: Text(
             draft.status == AttachmentDraftStatus.failed
-                ? 'Upload failed • tap retry'
+                ? '上传失败 • 点击重试'
                 : '${_formatFileSize(draft.byteLength)} • ${draft.status.name}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -52,24 +52,24 @@ class AttachmentDraftTile extends StatelessWidget {
           children: [
             _semanticIconButton(
               icon: Icons.arrow_upward,
-              label: 'Move attachment previous',
+              label: '上移附件',
               onPressed: busy || index == 0 ? null : onMovePrevious,
             ),
             _semanticIconButton(
               icon: Icons.arrow_downward,
-              label: 'Move attachment next',
+              label: '下移附件',
               onPressed: busy || index == total - 1 ? null : onMoveNext,
             ),
             if (draft.status == AttachmentDraftStatus.failed)
               _semanticIconButton(
                 icon: Icons.refresh,
-                label: 'Retry upload',
+                label: '重试上传',
                 onPressed: busy ? null : onRetry,
               )
             else
               _semanticIconButton(
                 icon: Icons.close,
-                label: 'Remove attachment',
+                label: '移除附件',
                 onPressed: busy ? null : onRemove,
               ),
           ],
@@ -79,10 +79,10 @@ class AttachmentDraftTile extends StatelessWidget {
   }
 
   String _statusLabel() => switch (draft.status) {
-    AttachmentDraftStatus.ready => 'Ready to upload',
-    AttachmentDraftStatus.uploading => 'Uploading',
-    AttachmentDraftStatus.attached => 'Uploaded',
-    AttachmentDraftStatus.failed => 'Upload failed',
+    AttachmentDraftStatus.ready => '准备上传',
+    AttachmentDraftStatus.uploading => '上传中',
+    AttachmentDraftStatus.attached => '已上传',
+    AttachmentDraftStatus.failed => '上传失败',
   };
 
   Widget _leading(BuildContext context) {

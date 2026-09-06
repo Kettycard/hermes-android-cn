@@ -64,13 +64,13 @@ enum ActivityGroupKind {
   String get title {
     switch (this) {
       case ActivityGroupKind.needsYou:
-        return 'Needs you';
+        return '需要你处理';
       case ActivityGroupKind.running:
-        return 'Running now';
+        return '正在运行';
       case ActivityGroupKind.failed:
-        return 'Failed';
+        return '失败';
       case ActivityGroupKind.completed:
-        return 'Completed';
+        return '已完成';
     }
   }
 }
@@ -276,7 +276,7 @@ _Classification _classify(
   if (entry.failure != null) {
     return const _Classification(
       ActivityGroupKind.failed,
-      'Turn recovery failed',
+      '轮次恢复失败',
       HermesStatus.failed,
     );
   }
@@ -285,25 +285,25 @@ _Classification _classify(
     case GatewayRecoveryTurnStatus.waitingInput:
       return const _Classification(
         ActivityGroupKind.needsYou,
-        'Waiting for your input',
+        '等待你的输入',
         HermesStatus.blocked,
       );
     case GatewayRecoveryTurnStatus.failed:
       return const _Classification(
         ActivityGroupKind.failed,
-        'The turn failed',
+        '轮次失败',
         HermesStatus.failed,
       );
     case GatewayRecoveryTurnStatus.completed:
       return const _Classification(
         ActivityGroupKind.completed,
-        'Completed',
+        '已完成',
         HermesStatus.completed,
       );
     case GatewayRecoveryTurnStatus.interrupted:
       return const _Classification(
         ActivityGroupKind.completed,
-        'Stopped',
+        '已停止',
         HermesStatus.idle,
       );
     case null:
@@ -314,7 +314,7 @@ _Classification _classify(
       if (ageMs > staleMs) {
         return const _Classification(
           ActivityGroupKind.failed,
-          'Stalled — no update from Hermes',
+          '已停滞 — Hermes 无更新',
           HermesStatus.failed,
         );
       }
@@ -322,7 +322,7 @@ _Classification _classify(
       // but the gateway has not answered yet, so the work is outstanding.
       return _Classification(
         ActivityGroupKind.running,
-        entry.status == null ? 'Submitted, waiting for Hermes' : 'Running',
+        entry.status == null ? '已提交，等待 Hermes' : '运行中',
         HermesStatus.running,
       );
   }

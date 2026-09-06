@@ -159,7 +159,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _loadMemory,
-                child: const Text('Retry'),
+                child: const Text('重试'),
               ),
             ],
           ),
@@ -175,13 +175,12 @@ class _MemoryScreenState extends State<MemoryScreen> {
             Icon(Icons.psychology, size: 48, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
-              'No memory entries',
+              '暂无记忆条目',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
-              'Memory entries are cross-session facts the agent remembers.\n'
-              'They are configured in ~/.hermes/config.yaml',
+              '记忆条目是智能体在跨会话中记住的事实。\n它们配置在 ~/.hermes/config.yaml',
               textAlign: TextAlign.center,
               style: Theme.of(
                 context,

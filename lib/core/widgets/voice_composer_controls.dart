@@ -24,7 +24,7 @@ class VoiceComposerIndicator extends StatelessWidget {
     return Semantics(
       container: true,
       liveRegion: true,
-      label: 'Listening, elapsed $elapsed',
+      label: '正在聆听，已用时 $elapsed',
       child: Container(
         key: indicatorKey,
         width: double.infinity,
@@ -47,7 +47,7 @@ class VoiceComposerIndicator extends StatelessWidget {
                   color: Theme.of(context).colorScheme.onErrorContainer,
                 ),
                 const SizedBox(width: 8),
-                Flexible(child: Text('Listening • $elapsed')),
+                Flexible(child: Text('聆听中 • $elapsed')),
               ],
             );
             final actions = Wrap(
@@ -55,25 +55,25 @@ class VoiceComposerIndicator extends StatelessWidget {
               spacing: 4,
               children: [
                 Semantics(
-                  label: 'Stop voice input',
+                  label: '停止语音输入',
                   button: true,
                   excludeSemantics: true,
                   child: TextButton.icon(
                     key: stopKey,
                     onPressed: onStop,
                     icon: const Icon(Icons.stop_rounded),
-                    label: const Text('Stop'),
+                    label: const Text('停止'),
                   ),
                 ),
                 Semantics(
-                  label: 'Cancel voice input',
+                  label: '取消语音输入',
                   button: true,
                   excludeSemantics: true,
                   child: TextButton.icon(
                     key: cancelKey,
                     onPressed: onCancel,
                     icon: const Icon(Icons.close),
-                    label: const Text('Cancel'),
+                    label: const Text('取消'),
                   ),
                 ),
               ],
@@ -119,14 +119,14 @@ class VoiceComposerStartButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Start voice input',
+      label: '开始语音输入',
       button: true,
       enabled: enabled,
       excludeSemantics: true,
       child: IconButton.filledTonal(
         icon: const Icon(Icons.mic),
         onPressed: enabled ? onPressed : null,
-        tooltip: 'Speak to Hermes',
+        tooltip: '对 Hermes 说话',
         constraints: const BoxConstraints.tightFor(width: 48, height: 48),
       ),
     );

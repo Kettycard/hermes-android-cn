@@ -130,7 +130,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _client.setModel('main', _selectedProvider, _selectedModel);
       setState(() {
         _successMsg =
-            'Profile default set to $_selectedModel. Chats with their own model keep that override.';
+            '配置默认模型已设为 $_selectedModel。已有独立模型设置的对话将保留各自设置。';
       });
     } catch (e) {
       setState(() {
@@ -143,12 +143,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('设置'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _loadData,
-            tooltip: 'Refresh',
+            tooltip: '刷新',
           ),
         ],
       ),
@@ -171,7 +171,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Icon(Icons.error_outline, size: 48, color: Colors.orange),
               const SizedBox(height: 16),
               Text(
-                'Failed to load settings',
+                '加载设置失败',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
@@ -181,7 +181,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              ElevatedButton(onPressed: _loadData, child: const Text('Retry')),
+              ElevatedButton(onPressed: _loadData, child: const Text('重试')),
             ],
           ),
         ),
@@ -192,9 +192,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         // ---- Section: Model ----
-        _buildSectionHeader('Profile default model'),
+        _buildSectionHeader('配置默认模型'),
         Text(
-          'Changes the default for ${widget.connection.label}. Use the selector in a chat to override only that conversation.',
+          '更改 ${widget.connection.label} 的默认模型。在对话中使用选择器可仅覆盖该对话。',
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 8),
@@ -213,14 +213,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Current profile default',
+                        '当前配置默认',
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${_modelInfo!['model'] ?? '???'}  \nvia `${_modelInfo!['provider'] ?? '???'}`',
+                    '${_modelInfo!['model'] ?? '???'}  \n提供商：`${_modelInfo!['provider'] ?? '???'}`',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   if (_modelInfo!['effective_context_length'] != null &&
@@ -228,7 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        'Context: ${_modelInfo!['effective_context_length']} tokens',
+                        '上下文：${_modelInfo!['effective_context_length']} tokens',
                         style: Theme.of(
                           context,
                         ).textTheme.bodySmall?.copyWith(color: Colors.grey),
@@ -243,7 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // Provider picker
         if (_providers.isNotEmpty) ...[
           _buildDropdown<String>(
-            label: 'Provider',
+            label: '提供商',
             value:
                 _selectedProvider.isNotEmpty &&
                     _providers.contains(_selectedProvider)
@@ -272,7 +272,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (_selectedProvider.isNotEmpty &&
             _providerModels.containsKey(_selectedProvider)) ...[
           _buildDropdown<String>(
-            label: 'Model',
+            label: '模型',
             value: _selectedModel,
             items: _providerModels[_selectedProvider]!.map((m) {
               final id = m['id'] as String? ?? '';
@@ -289,7 +289,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: FilledButton.icon(
               onPressed: _applyModel,
               icon: const Icon(Icons.check),
-              label: const Text('Set profile default'),
+              label: const Text('设为配置默认'),
             ),
           ),
         ],
@@ -319,7 +319,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 16),
 
         // ---- Section: Theme ----
-        _buildSectionHeader('Appearance'),
+        _buildSectionHeader('外观'),
         _ThemeToggle(),
         const SizedBox(height: 8),
         TextSizeSettingsCard(
@@ -339,28 +339,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 16),
 
         // ---- Section: Voice ----
-        _buildSectionHeader('Voice'),
+        _buildSectionHeader('语音'),
         _VoicePicker(),
         const SizedBox(height: 16),
 
         // ---- Section: Session Sources ----
-        _buildSectionHeader('Session Sources'),
+        _buildSectionHeader('会话来源'),
         _SessionSourcesFilter(connectionId: widget.connection.id),
         const SizedBox(height: 16),
 
         // ---- Section: Connection ----
-        _buildSectionHeader('Connection'),
+        _buildSectionHeader('连接'),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _infoRow('Label', widget.connection.label),
+                _infoRow('标签', widget.connection.label),
                 const SizedBox(height: 4),
-                _infoRow('Host', widget.connection.host),
+                _infoRow('主机', widget.connection.host),
                 const SizedBox(height: 4),
-                _infoRow('Port', '${widget.connection.port}'),
+                _infoRow('端口', '${widget.connection.port}'),
                 const SizedBox(height: 4),
                 _infoRow('Base URL', widget.connection.baseUrl),
               ],
@@ -370,7 +370,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 16),
 
         // ---- Section: Backup ----
-        _buildSectionHeader('Backup & restore'),
+        _buildSectionHeader('备份与恢复'),
         ConfigBackupCard(
           onExport: _exportConfig,
           onDeliverExport: _deliverExport,
@@ -380,7 +380,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 16),
 
         // ---- Section: About ----
-        _buildSectionHeader('About'),
+        _buildSectionHeader('关于'),
         _AboutCard(),
       ],
     );
@@ -493,7 +493,7 @@ class _AboutCardState extends State<_AboutCard> {
       final info = await PackageInfo.fromPlatform();
       setState(() => _version = '${info.version}+${info.buildNumber}');
     } catch (_) {
-      setState(() => _version = 'unknown');
+      setState(() => _version = '未知');
     }
   }
 
@@ -510,11 +510,10 @@ class _AboutCardState extends State<_AboutCard> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
-            Text('Version ${_version.isNotEmpty ? _version : '…'}'),
+            Text('版本 ${_version.isNotEmpty ? _version : '…'}'),
             const SizedBox(height: 8),
             const Text(
-              'Browse and manage your Hermes Agent sessions from your phone. '
-              'Connects to a Hermes dashboard running on your local network.',
+              '在手机上浏览和管理你的 Hermes Agent 会话。连接到本地网络中运行的 Hermes 仪表盘。',
               style: TextStyle(color: Colors.grey),
             ),
           ],
@@ -554,8 +553,8 @@ class _VerboseToggleState extends State<_VerboseToggle> {
   Widget build(BuildContext context) {
     return Card(
       child: SwitchListTile(
-        title: const Text('Verbose Mode'),
-        subtitle: const Text('Show tool calls, thinking, and message metadata'),
+        title: const Text('详细模式'),
+        subtitle: const Text('显示工具调用、思考和消息元数据'),
         secondary: const Icon(Icons.terminal),
         value: _verbose,
         onChanged: _set,
@@ -600,17 +599,17 @@ class _ThemeToggleState extends State<_ThemeToggle> {
         segments: const [
           ButtonSegment(
             value: 'system',
-            label: Text('System'),
+            label: Text('系统'),
             icon: Icon(Icons.brightness_auto, size: 18),
           ),
           ButtonSegment(
             value: 'dark',
-            label: Text('Dark'),
+            label: Text('深色'),
             icon: Icon(Icons.dark_mode, size: 18),
           ),
           ButtonSegment(
             value: 'light',
-            label: Text('Light'),
+            label: Text('浅色'),
             icon: Icon(Icons.light_mode, size: 18),
           ),
         ],
@@ -698,9 +697,9 @@ class _VoicePickerState extends State<_VoicePicker> {
     final locale = voice['locale'] ?? '';
     if (name == locale) return locale;
     final gender = name.contains('male')
-        ? '(male)'
+        ? '(男)'
         : name.contains('female')
-        ? '(female)'
+        ? '(女)'
         : '';
     return '$locale $gender  [$name]';
   }
@@ -721,8 +720,8 @@ class _VoicePickerState extends State<_VoicePicker> {
         child: Padding(
           padding: EdgeInsets.all(16),
           child: Text(
-            'No TTS voices found.\\n'
-            'Install Google Text-to-Speech and download voice data.',
+            '未找到 TTS 语音。\\n'
+            '请安装 Google 文字转语音并下载语音数据。',
             style: TextStyle(color: Colors.grey),
           ),
         ),
@@ -730,7 +729,7 @@ class _VoicePickerState extends State<_VoicePicker> {
     }
 
     final items = <DropdownMenuItem<Map<String, String>?>>[
-      const DropdownMenuItem(value: null, child: Text('Auto (device default)')),
+      const DropdownMenuItem(value: null, child: Text('自动（设备默认）')),
       ..._voices.map(
         (v) => DropdownMenuItem(
           value: v,
@@ -750,7 +749,7 @@ class _VoicePickerState extends State<_VoicePicker> {
     return DropdownButtonFormField<Map<String, String>?>(
       initialValue: current,
       decoration: const InputDecoration(
-        labelText: 'Voice',
+        labelText: '语音',
         border: OutlineInputBorder(),
         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
@@ -774,20 +773,20 @@ class _SessionSourcesFilterState extends State<_SessionSourcesFilter> {
   /// Known session source types. Hermes Gateway persists `session.source` for
   /// every session. Sources not in this list are always shown (whitelisted).
   static const Map<String, String> _knownSources = {
-    'acp': 'Autonomous agents',
-    'api_server': 'External API clients',
-    'cli': 'Command-line chats',
-    'cron': 'Scheduled tasks',
-    'desktop': 'Desktop app',
-    'discord': 'Discord chats',
-    'gateway': 'Gateway API access',
-    'mobile': 'Phone or tablet',
-    'signal': 'Signal messages',
-    'slack': 'Slack chats',
-    'telegram': 'Telegram messages',
-    'tool': 'Developer tool calls',
-    'tui': 'Terminal sessions',
-    'whatsapp': 'WhatsApp messages',
+    'acp': '自主智能体',
+    'api_server': '外部 API 客户端',
+    'cli': '命令行对话',
+    'cron': '定时任务',
+    'desktop': '桌面应用',
+    'discord': 'Discord 对话',
+    'gateway': '网关 API 访问',
+    'mobile': '手机或平板',
+    'signal': 'Signal 消息',
+    'slack': 'Slack 对话',
+    'telegram': 'Telegram 消息',
+    'tool': '开发者工具调用',
+    'tui': '终端会话',
+    'whatsapp': 'WhatsApp 消息',
   };
 
   Set<String> _excluded = {};

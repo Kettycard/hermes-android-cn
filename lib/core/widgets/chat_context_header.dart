@@ -56,7 +56,7 @@ class ChatContextHeader extends StatelessWidget {
               _ContextChip(
                 icon: Icons.folder_outlined,
                 label: project == null || project.isEmpty
-                    ? 'Unassigned'
+                    ? '未分配'
                     : project,
               ),
               const SizedBox(width: HermesSpacing.sm),
@@ -97,7 +97,7 @@ class ChatContextHeader extends StatelessWidget {
 
   String _reasoningLabel(String value) {
     final normalized = value.trim().toLowerCase();
-    if (normalized.isEmpty || normalized == 'none') return 'Off';
+    if (normalized.isEmpty || normalized == 'none') return '关闭';
     return normalized[0].toUpperCase() + normalized.substring(1);
   }
 }

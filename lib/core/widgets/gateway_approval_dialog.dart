@@ -44,29 +44,29 @@ class _GatewayApprovalDialogState extends State<GatewayApprovalDialog> {
       if (!mounted) return;
       setState(() {
         _submitting = null;
-        _error = 'Could not send the approval: $error';
+        _error = '无法发送审批：$error';
       });
     }
   }
 
   String _labelFor(GatewayApprovalChoice choice) {
     return switch (choice) {
-      GatewayApprovalChoice.once => 'Allow once',
-      GatewayApprovalChoice.session => 'Allow for this session',
+      GatewayApprovalChoice.once => '仅允许一次',
+      GatewayApprovalChoice.session => '本次会话允许',
       GatewayApprovalChoice.always =>
-        _confirmAlways ? 'Confirm always allow' : 'Always allow',
-      GatewayApprovalChoice.deny => 'Deny',
+        _confirmAlways ? '确认永久允许' : '永久允许',
+      GatewayApprovalChoice.deny => '拒绝',
     };
   }
 
   String _scopeFor(GatewayApprovalChoice choice) {
     return switch (choice) {
-      GatewayApprovalChoice.once => 'Run only this command.',
+      GatewayApprovalChoice.once => '仅运行此命令。',
       GatewayApprovalChoice.session =>
-        'Allow matching commands until this Hermes session ends.',
+        '在 Hermes 会话结束前允许匹配的命令。',
       GatewayApprovalChoice.always =>
-        'Save a permanent rule in the Hermes configuration.',
-      GatewayApprovalChoice.deny => 'Do not run this command.',
+        '在 Hermes 配置中保存一条永久规则。',
+      GatewayApprovalChoice.deny => '不要运行此命令。',
     };
   }
 
@@ -87,7 +87,7 @@ class _GatewayApprovalDialogState extends State<GatewayApprovalDialog> {
 
     return AlertDialog(
       icon: const Icon(Icons.gpp_maybe_outlined),
-      title: const Text('Approval needed'),
+      title: const Text('需要审批'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: SingleChildScrollView(
@@ -98,7 +98,7 @@ class _GatewayApprovalDialogState extends State<GatewayApprovalDialog> {
               Text(request.description),
               if (request.command.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text('Command', style: theme.textTheme.labelLarge),
+                Text('命令', style: theme.textTheme.labelLarge),
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -117,8 +117,7 @@ class _GatewayApprovalDialogState extends State<GatewayApprovalDialog> {
               if (_confirmAlways) ...[
                 const SizedBox(height: 14),
                 Text(
-                  'This creates a permanent rule in Hermes. Review the full '
-                  'command before confirming.',
+                  '这会在 Hermes 中创建一条永久规则。确认前请仔细查看完整命令。',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.error,
                   ),

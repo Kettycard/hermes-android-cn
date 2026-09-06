@@ -45,19 +45,18 @@ enum NewChatMode {
   String get label {
     switch (this) {
       case NewChatMode.projectChat:
-        return 'Project chat';
+        return '项目对话';
       case NewChatMode.quickChat:
-        return 'Quick chat';
+        return '快捷对话';
     }
   }
 
   String get description {
     switch (this) {
       case NewChatMode.projectChat:
-        return 'Durable work inside one of your projects, shared with Desktop.';
+        return '在你的某个项目中进行持久的工作，并与桌面端共享。';
       case NewChatMode.quickChat:
-        return 'A one-off question. Archives itself after 72 hours; anything '
-            'worth keeping is still remembered.';
+        return '一次性提问。72 小时后自动归档；值得保留的内容仍会被记住。';
     }
   }
 }
@@ -96,14 +95,13 @@ List<NewChatOption> buildNewChatOptions({
   String? projectChatBlocker;
   switch (support) {
     case ProjectsSupport.unknown:
-      projectChatBlocker = 'Still loading your projects.';
+      projectChatBlocker = '正在加载你的项目。';
     case ProjectsSupport.unsupported:
       projectChatBlocker =
-          'This gateway does not host projects yet. Update the gateway to '
-          'organize chats across your devices.';
+          '该网关暂不支持项目。请更新网关，以便跨设备整理对话。';
     case ProjectsSupport.native:
       projectChatBlocker = usable.isEmpty
-          ? 'Create a project first, then chats can live inside it.'
+          ? '请先创建项目，之后对话才能归入其中。'
           : null;
   }
 
@@ -177,8 +175,8 @@ NewChatDraft buildNewChatDraft({
 
   final projectName = project?.name.trim() ?? '';
   final title = isQuick
-      ? 'Quick chat'
-      : (projectName.isEmpty ? 'New chat' : 'New chat · $projectName');
+      ? '快捷对话'
+      : (projectName.isEmpty ? '新对话' : '新对话 · $projectName');
 
   return NewChatDraft(
     session: Session(

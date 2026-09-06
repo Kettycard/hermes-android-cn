@@ -43,15 +43,15 @@ class _ExportPassphraseSheetState extends State<ExportPassphraseSheet> {
   void _submit() {
     final value = _passphrase.text;
     if (value.trim().isEmpty) {
-      setState(() => _error = 'Enter a passphrase.');
+      setState(() => _error = '请输入密码短语。');
       return;
     }
     if (value.length < 8) {
-      setState(() => _error = 'Use at least 8 characters.');
+      setState(() => _error = '请至少使用 8 个字符。');
       return;
     }
     if (value != _confirm.text) {
-      setState(() => _error = 'The two passphrases do not match.');
+      setState(() => _error = '两次输入的密码短语不一致。');
       return;
     }
     Navigator.of(context).pop(ExportPassphraseChoice(value));
@@ -71,13 +71,12 @@ class _ExportPassphraseSheetState extends State<ExportPassphraseSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Protect this backup',
+            '保护此备份',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           const Text(
-            'The file contains your API keys and dashboard password, so it is '
-            'encrypted. Without this passphrase the backup cannot be restored.',
+            '该文件包含你的 API 密钥和仪表盘密码，因此已加密。没有此密码短语将无法恢复备份。',
             style: TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 16),
@@ -87,12 +86,12 @@ class _ExportPassphraseSheetState extends State<ExportPassphraseSheet> {
             obscureText: _obscure,
             autofocus: true,
             decoration: InputDecoration(
-              labelText: 'Passphrase',
+              labelText: '密码短语',
               border: const OutlineInputBorder(),
               suffixIcon: IconButton(
                 icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
                 onPressed: () => setState(() => _obscure = !_obscure),
-                tooltip: _obscure ? 'Show passphrase' : 'Hide passphrase',
+                tooltip: _obscure ? '显示密码短语' : '隐藏密码短语',
               ),
             ),
           ),
@@ -102,7 +101,7 @@ class _ExportPassphraseSheetState extends State<ExportPassphraseSheet> {
             controller: _confirm,
             obscureText: _obscure,
             decoration: const InputDecoration(
-              labelText: 'Confirm passphrase',
+              labelText: '确认密码短语',
               border: OutlineInputBorder(),
             ),
             onSubmitted: (_) => _submit(),
@@ -119,14 +118,14 @@ class _ExportPassphraseSheetState extends State<ExportPassphraseSheet> {
             children: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: const Text('取消'),
               ),
               const Spacer(),
               FilledButton.icon(
                 key: const Key('export_confirm_button'),
                 onPressed: _submit,
                 icon: const Icon(Icons.lock),
-                label: const Text('Export'),
+                label: const Text('导出'),
               ),
             ],
           ),
@@ -158,7 +157,7 @@ class _ImportOptionsSheetState extends State<ImportOptionsSheet> {
 
   void _submit() {
     if (_passphrase.text.trim().isEmpty) {
-      setState(() => _error = 'Enter the passphrase for this backup.');
+      setState(() => _error = '请输入此备份的密码短语。');
       return;
     }
     Navigator.of(
@@ -180,7 +179,7 @@ class _ImportOptionsSheetState extends State<ImportOptionsSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Restore configuration',
+            '恢复配置',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 16),
@@ -190,12 +189,12 @@ class _ImportOptionsSheetState extends State<ImportOptionsSheet> {
             obscureText: _obscure,
             autofocus: true,
             decoration: InputDecoration(
-              labelText: 'Passphrase',
+              labelText: '密码短语',
               border: const OutlineInputBorder(),
               suffixIcon: IconButton(
                 icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
                 onPressed: () => setState(() => _obscure = !_obscure),
-                tooltip: _obscure ? 'Show passphrase' : 'Hide passphrase',
+                tooltip: _obscure ? '显示密码短语' : '隐藏密码短语',
               ),
             ),
             onSubmitted: (_) => _submit(),
@@ -210,19 +209,18 @@ class _ImportOptionsSheetState extends State<ImportOptionsSheet> {
                 RadioListTile<ConfigImportMode>(
                   key: Key('import_mode_merge'),
                   value: ConfigImportMode.merge,
-                  title: Text('Merge'),
+                  title: Text('合并'),
                   subtitle: Text(
-                    'Add and update connections from the backup, keep the '
-                    'rest.',
+                    '从备份中添加并更新连接，保留其余内容。',
                   ),
                   contentPadding: EdgeInsets.zero,
                 ),
                 RadioListTile<ConfigImportMode>(
                   key: Key('import_mode_replace'),
                   value: ConfigImportMode.replace,
-                  title: Text('Replace'),
+                  title: Text('替换'),
                   subtitle: Text(
-                    'Delete connections that are not in the backup.',
+                    '删除备份中不存在的连接。',
                   ),
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -241,14 +239,14 @@ class _ImportOptionsSheetState extends State<ImportOptionsSheet> {
             children: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: const Text('取消'),
               ),
               const Spacer(),
               FilledButton.icon(
                 key: const Key('import_confirm_button'),
                 onPressed: _submit,
                 icon: const Icon(Icons.restore),
-                label: const Text('Restore'),
+                label: const Text('恢复'),
               ),
             ],
           ),
@@ -317,7 +315,7 @@ class _ConfigBackupCardState extends State<ConfigBackupCard> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _status = destination == null ? null : 'Backup exported — $destination';
+        _status = destination == null ? null : '备份已导出 — $destination';
       });
     } on ConfigBackupException catch (error) {
       if (!mounted) return;
@@ -329,7 +327,7 @@ class _ConfigBackupCardState extends State<ConfigBackupCard> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'The backup could not be exported.';
+        _error = '备份导出失败。';
       });
     }
   }
@@ -371,7 +369,7 @@ class _ConfigBackupCardState extends State<ConfigBackupCard> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'The backup could not be restored.';
+        _error = '备份恢复失败。';
       });
     }
   }
@@ -392,15 +390,14 @@ class _ConfigBackupCardState extends State<ConfigBackupCard> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Backup & restore',
+                  '备份与恢复',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
               ],
             ),
             const SizedBox(height: 8),
             const Text(
-              'Save your connections and settings to an encrypted file, then '
-              'restore them after reinstalling or on another device.',
+              '将你的连接和设置保存到加密文件中，重装应用或在其他设备上时再恢复。',
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 16),
@@ -417,7 +414,7 @@ class _ConfigBackupCardState extends State<ConfigBackupCard> {
                       key: const Key('config_export_button'),
                       onPressed: _runExport,
                       icon: const Icon(Icons.upload_file),
-                      label: const Text('Export'),
+                      label: const Text('导出'),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -426,7 +423,7 @@ class _ConfigBackupCardState extends State<ConfigBackupCard> {
                       key: const Key('config_import_button'),
                       onPressed: _runImport,
                       icon: const Icon(Icons.download),
-                      label: const Text('Import'),
+                      label: const Text('导入'),
                     ),
                   ),
                 ],

@@ -74,15 +74,11 @@ class MoreSection {
 }
 
 const _dashboardRequired =
-    'Needs a reachable Hermes dashboard. Check the host, port, and '
-    'credentials of this connection.';
-const _gatewayAssetsRequired =
-    'Needs a server-authoritative Assets index in the Hermes Gateway.';
+    '需要可访问的 Hermes 仪表盘。请检查此连接的主机、端口和凭据。';
+const _gatewayAssetsRequired = '需要 Hermes 网关提供服务器端权威的资产索引。';
 const _gatewayOrganizationRequired =
-    'Needs durable pin ordering, batch mutation, and undo contracts in the '
-    'Hermes Gateway.';
-const _gatewayAiFilingRequired =
-    'Needs a correction-aware filing contract in the Hermes Gateway.';
+    '需要 Hermes 网关提供持久的置顶排序、批量修改和撤销契约。';
+const _gatewayAiFilingRequired = '需要 Hermes 网关提供具备纠正能力的归档契约。';
 
 /// Builds the More menu for the current connection.
 ///
@@ -97,32 +93,32 @@ List<MoreSection> buildMoreSections({required bool dashboardReachable}) {
 
   return [
     MoreSection(
-      title: 'Workspace',
+      title: '工作区',
       entries: [
         const MoreEntry(
           id: 'unassigned',
-          title: 'Unassigned chats',
-          subtitle: 'Chats that are not assigned to a Project',
+          title: '未分配对话',
+          subtitle: '尚未分配到项目的对话',
           icon: Icons.inbox_outlined,
         ),
         const MoreEntry(
           id: 'archived-quick',
-          title: 'Archived quick chats',
-          subtitle: 'Review or promote quick chats past their retention period',
+          title: '已归档的快捷对话',
+          subtitle: '查看或恢复超过保留期的快捷对话',
           icon: Icons.archive_outlined,
         ),
         MoreEntry(
           id: 'files',
-          title: 'Files',
-          subtitle: 'Browse the miniserver folders behind your projects',
+          title: '文件',
+          subtitle: '浏览项目背后的 miniserver 文件夹',
           icon: Icons.folder_open_outlined,
           availability: dashboardBacked(),
           unavailableReason: dashboardReason(),
         ),
         const MoreEntry(
           id: 'assets',
-          title: 'Assets',
-          subtitle: 'Artifacts, attachments, and generated media',
+          title: '资产',
+          subtitle: '产物、附件和生成的媒体',
           icon: Icons.image_outlined,
           availability: MoreEntryAvailability.unavailable,
           unavailableReason: _gatewayAssetsRequired,
@@ -130,20 +126,20 @@ List<MoreSection> buildMoreSections({required bool dashboardReachable}) {
       ],
     ),
     const MoreSection(
-      title: 'Organization',
+      title: '整理',
       entries: [
         MoreEntry(
           id: 'pin-batch-undo',
-          title: 'Pin, batch and undo',
-          subtitle: 'Cross-device ordering and reversible bulk organization',
+          title: '置顶、批量与撤销',
+          subtitle: '跨设备排序和可逆的批量整理',
           icon: Icons.push_pin_outlined,
           availability: MoreEntryAvailability.unavailable,
           unavailableReason: _gatewayOrganizationRequired,
         ),
         MoreEntry(
           id: 'ai-filing',
-          title: 'AI-assisted filing',
-          subtitle: 'Suggest Projects and learn from your corrections',
+          title: 'AI 辅助归档',
+          subtitle: '建议项目并从你的纠正中学习',
           icon: Icons.auto_fix_high_outlined,
           availability: MoreEntryAvailability.unavailable,
           unavailableReason: _gatewayAiFilingRequired,
@@ -151,28 +147,28 @@ List<MoreSection> buildMoreSections({required bool dashboardReachable}) {
       ],
     ),
     MoreSection(
-      title: 'Automation',
+      title: '自动化',
       entries: [
         MoreEntry(
           id: 'cron',
-          title: 'Cron',
-          subtitle: 'Scheduled jobs and their last runs',
+          title: '定时任务',
+          subtitle: '计划任务及其最近一次运行',
           icon: Icons.schedule_outlined,
           availability: dashboardBacked(),
           unavailableReason: dashboardReason(),
         ),
         MoreEntry(
           id: 'skills',
-          title: 'Skills and tools',
-          subtitle: 'What Hermes knows how to do',
+          title: '技能与工具',
+          subtitle: 'Hermes 能做到什么',
           icon: Icons.auto_awesome_outlined,
           availability: dashboardBacked(),
           unavailableReason: dashboardReason(),
         ),
         MoreEntry(
           id: 'memory',
-          title: 'Memory',
-          subtitle: 'Durable facts Hermes keeps about you',
+          title: '记忆',
+          subtitle: 'Hermes 记住的关于你的持久事实',
           icon: Icons.psychology_outlined,
           availability: dashboardBacked(),
           unavailableReason: dashboardReason(),
@@ -180,19 +176,18 @@ List<MoreSection> buildMoreSections({required bool dashboardReachable}) {
       ],
     ),
     MoreSection(
-      title: 'System',
+      title: '系统',
       entries: [
         const MoreEntry(
           id: 'settings',
-          title: 'Settings',
-          subtitle: 'Connection, appearance, and device preferences',
+          title: '设置',
+          subtitle: '连接、外观和设备偏好',
           icon: Icons.settings_outlined,
         ),
         MoreEntry(
           id: 'dashboard',
-          title: 'Open the Hermes dashboard',
-          subtitle:
-              'Everything not yet native, in the authenticated web dashboard',
+          title: '打开 Hermes 仪表盘',
+          subtitle: '尚未原生化的功能都在经过身份验证的网页仪表盘中',
           icon: Icons.open_in_new,
           availability: dashboardBacked(),
           unavailableReason: dashboardReason(),
@@ -290,7 +285,7 @@ class _MoreEntryCard extends StatelessWidget {
                           MoreEntryAvailability.comingSoon)
                         const StatusChip(
                           status: HermesStatus.idle,
-                          label: 'Coming next',
+                          label: '即将推出',
                         ),
                     ],
                   ),

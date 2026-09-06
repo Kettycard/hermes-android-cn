@@ -158,14 +158,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                 HermesSpacing.lg,
                 HermesSpacing.sm,
               ),
-              child: Text('Move conversation'),
+              child: Text('移动对话'),
             ),
             ListTile(
               leading: const Icon(Icons.inbox_outlined),
-              title: const Text('Unassigned'),
+              title: const Text('未分配'),
               onTap: () => Navigator.pop(
                 context,
-                const _MoveTarget(projectId: null, label: 'Unassigned'),
+                const _MoveTarget(projectId: null, label: '未分配'),
               ),
             ),
             for (final project in widget.projects)
@@ -194,14 +194,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Moved to ${target.label}')));
+      ).showSnackBar(SnackBar(content: Text('已移动到 ${target.label}')));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Couldn’t move conversation'),
+          content: const Text('无法移动对话'),
           action: SnackBarAction(
-            label: 'Retry',
+            label: '重试',
             onPressed: () => _moveSession(session, target),
           ),
         ),
@@ -216,26 +216,26 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     final name = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Rename $_projectName'),
+        title: Text('重命名 $_projectName'),
         content: TextFormField(
           key: const Key('rename-project-name'),
           initialValue: _projectName,
           autofocus: true,
           maxLength: 80,
-          decoration: const InputDecoration(labelText: 'Name'),
+          decoration: const InputDecoration(labelText: '名称'),
           onChanged: (value) => draft = value,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: const Text('取消'),
           ),
           FilledButton(
             onPressed: () {
               final value = draft.trim();
               if (value.isNotEmpty) Navigator.pop(dialogContext, value);
             },
-            child: const Text('Rename'),
+            child: const Text('重命名'),
           ),
         ],
       ),
@@ -253,7 +253,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     } catch (_) {
       if (!mounted) return;
       setState(() => _managing = false);
-      _showManagementError('rename', _renameProject);
+      _showManagementError('重命名', _renameProject);
     }
   }
 
@@ -261,19 +261,18 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Archive $_projectName?'),
+        title: Text('归档 $_projectName？'),
         content: const Text(
-          'The Project will move to Archived. Its chats and files stay intact, '
-          'and you can restore it later.',
+          '项目将移入“已归档”。其对话和文件保持不变，你可以稍后恢复。',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: const Text('取消'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Archive'),
+            child: const Text('归档'),
           ),
         ],
       ),
@@ -297,15 +296,15 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     } catch (_) {
       if (!mounted) return;
       setState(() => _managing = false);
-      _showManagementError('archive', _archiveProject);
+      _showManagementError('归档', _archiveProject);
     }
   }
 
   void _showManagementError(String action, Future<void> Function() retry) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Couldn’t $action project'),
-        action: SnackBarAction(label: 'Retry', onPressed: retry),
+        content: Text('无法$action项目'),
+        action: SnackBarAction(label: '重试', onPressed: retry),
       ),
     );
   }
@@ -314,22 +313,21 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Delete $_projectName?'),
+        title: Text('删除 $_projectName？'),
         content: const Text(
-          'This permanently deletes the Project. Chats will not be deleted; '
-          'they’ll return to Unassigned.',
+          '这将永久删除该项目。对话不会被删除，它们将回到“未分配”。',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: const Text('取消'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Delete'),
+            child: const Text('删除'),
           ),
         ],
       ),
@@ -358,9 +356,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
       setState(() => _deleting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Couldn’t delete project'),
+          content: const Text('无法删除项目'),
           action: SnackBarAction(
-            label: 'Retry',
+            label: '重试',
             onPressed: () => _deleteProject(),
           ),
         ),
@@ -392,7 +390,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               )
             else
               PopupMenuButton<String>(
-                tooltip: 'Project actions',
+                tooltip: '项目操作',
                 onSelected: (action) {
                   switch (action) {
                     case 'rename':
@@ -407,12 +405,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                   if (widget.onRenameProject != null)
                     const PopupMenuItem<String>(
                       value: 'rename',
-                      child: Text('Rename project'),
+                      child: Text('重命名项目'),
                     ),
                   if (widget.onArchiveProject != null)
                     const PopupMenuItem<String>(
                       value: 'archive',
-                      child: Text('Archive project'),
+                      child: Text('归档项目'),
                     ),
                   if (widget.onDeleteProject != null)
                     PopupMenuItem<String>(
@@ -425,7 +423,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                           ),
                           const SizedBox(width: HermesSpacing.sm),
                           Text(
-                            'Delete project',
+                            '删除项目',
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.error,
                             ),
@@ -439,11 +437,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         bottom: TabBar(
           controller: _tabs,
           tabs: const [
-            Tab(text: 'Chats'),
-            Tab(text: 'Overview'),
-            Tab(text: 'Files'),
-            Tab(text: 'Assets'),
-            Tab(text: 'Activity'),
+            Tab(text: '对话'),
+            Tab(text: '概览'),
+            Tab(text: '文件'),
+            Tab(text: '资产'),
+            Tab(text: '活动'),
           ],
           isScrollable: true,
         ),
@@ -455,7 +453,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               key: kProjectNewChatButtonKey,
               onPressed: widget.onNewChat,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('New chat'),
+              label: const Text('新对话'),
             ),
     );
   }
@@ -472,19 +470,17 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     // chats" here would state something this gateway cannot actually know.
     if (view.support == ProjectsSupport.unsupported) {
       return const ErrorState.unsupported(
-        title: 'Project chats unavailable',
+        title: '项目对话暂不可用',
         message:
-            'This Hermes gateway does not support opening a project yet. '
-            'Update Hermes on the server to browse a project from your phone.',
+            '此 Hermes 网关尚不支持打开项目。请在服务器上更新 Hermes，即可从手机浏览项目。',
       );
     }
 
     // Only a *first* read with nothing to show is an error screen.
     if (view.error != null && view.sessions.isEmpty && !view.isStale) {
       return ErrorState(
-        title: 'Could not open this project',
-        message:
-            'Check that the gateway is running and reachable, then try again.',
+        title: '无法打开此项目',
+        message: '请确认网关正在运行且可访问，然后重试。',
         onRetry: () => _load(refresh: true),
       );
     }
@@ -528,13 +524,13 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                   key: kProjectSearchFieldKey,
                   controller: _searchController,
                   onChanged: _onSearchChanged,
-                  hintText: 'Search chats',
+                  hintText: '搜索对话',
                   leading: const Icon(Icons.search),
                   trailing: [
                     if (querying)
                       IconButton(
                         icon: const Icon(Icons.close),
-                        tooltip: 'Clear search',
+                        tooltip: '清空搜索',
                         onPressed: () {
                           _searchController.clear();
                           _onSearchChanged('');
@@ -549,10 +545,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               hasScrollBody: false,
               child: EmptyState(
                 icon: Icons.forum_outlined,
-                title: 'No chats yet',
+                title: '还没有对话',
                 message:
-                    'Chats you start in this project will appear here, on '
-                    'every device signed in to this Hermes.',
+                    '你在此项目中开始的对话会显示在这里，并同步到登录此 Hermes 的所有设备。',
               ),
             )
           else if (filtered.isEmpty)
@@ -563,10 +558,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               hasScrollBody: false,
               child: EmptyState(
                 icon: Icons.search_off,
-                title: 'No matches',
+                title: '没有匹配结果',
                 message:
-                    'No chats in this project match '
-                    '“${_searchQuery.trim()}”.',
+                    '此项目中没有对话匹配 “${_searchQuery.trim()}”。',
               ),
             )
           else
@@ -610,7 +604,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         padding: const EdgeInsets.only(bottom: HermesSpacing.xl),
         children: [
           if (view.isStale) const _OfflineNotice(),
-          const SectionHeader(title: 'Chats'),
+          const SectionHeader(title: '对话'),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: HermesSpacing.lg),
             child: HermesCard(
@@ -620,7 +614,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                   const SizedBox(width: HermesSpacing.md),
                   Expanded(
                     child: Text(
-                      'Conversations in this project',
+                      '此项目中的对话',
                       style: tokens.typography.body.copyWith(
                         color: tokens.onSurface,
                       ),
@@ -638,7 +632,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             ),
           ),
           if (tree != null && tree.repos.isNotEmpty) ...[
-            const SectionHeader(title: 'Repositories'),
+            const SectionHeader(title: '仓库'),
             for (final repo in tree.repos)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -651,7 +645,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               ),
           ],
           if (tree?.path != null) ...[
-            const SectionHeader(title: 'Location'),
+            const SectionHeader(title: '位置'),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: HermesSpacing.lg),
               child: HermesCard(
@@ -701,14 +695,13 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               padding: EdgeInsets.only(top: HermesSpacing.xl),
               child: EmptyState(
                 icon: Icons.folder_open_outlined,
-                title: 'No folders yet',
+                title: '还没有文件夹',
                 message:
-                    'The server has not reported folders for this project yet. '
-                    'Global Files stays available from More.',
+                    '服务器尚未报告此项目的文件夹。全局文件仍可从“更多”中访问。',
               ),
             )
           else ...[
-            const SectionHeader(title: 'Folders'),
+            const SectionHeader(title: '文件夹'),
             for (final path in paths)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -756,10 +749,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           const Padding(
             padding: EdgeInsets.only(top: HermesSpacing.xl),
             child: ErrorState.unsupported(
-              title: 'Assets unavailable',
+              title: '资产暂不可用',
               message:
-                  'Assets need a server-authoritative Assets index in the '
-                  'Hermes Gateway before they can be shown per project.',
+                  '资产需要 Hermes 网关提供服务器端权威的资产索引，才能按项目显示。',
             ),
           ),
         ],
@@ -787,10 +779,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               padding: EdgeInsets.only(top: HermesSpacing.xl),
               child: EmptyState(
                 icon: Icons.bolt_outlined,
-                title: 'No activity yet',
+                title: '还没有活动',
                 message:
-                    'Chats in this project will show their state and last '
-                    'activity here.',
+                    '此项目中的对话将在这里显示其状态和最近的活动时间。',
               ),
             )
           else
@@ -812,7 +803,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                           children: [
                             Text(
                               session.title.trim().isEmpty
-                                  ? 'Untitled chat'
+                                  ? '未命名对话'
                                   : session.title,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -831,7 +822,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                         status: session.isActive
                             ? HermesStatus.running
                             : HermesStatus.completed,
-                        label: session.isActive ? 'Running' : 'Done',
+                        label: session.isActive ? '运行中' : '已完成',
                       ),
                     ],
                   ),
@@ -864,7 +855,7 @@ class _OfflineNotice extends StatelessWidget {
           const SizedBox(width: HermesSpacing.sm),
           Expanded(
             child: Text(
-              'Offline — showing the last known chats',
+              '已离线 — 显示最近一次已知的对话',
               style: tokens.typography.label.copyWith(color: tokens.warning),
             ),
           ),
@@ -919,7 +910,7 @@ class _SessionCard extends StatelessWidget {
                 const SizedBox(width: HermesSpacing.xs),
                 IconButton(
                   key: Key('move-session-${session.id}'),
-                  tooltip: 'Move conversation',
+                  tooltip: '移动对话',
                   onPressed: onMove,
                   icon: const Icon(Icons.drive_file_move_outline, size: 20),
                 ),
@@ -983,7 +974,7 @@ class _RepoCard extends StatelessWidget {
               children: [
                 for (final lane in lanes)
                   Text(
-                    lane.isMain ? '${lane.label} · main' : lane.label,
+                    lane.isMain ? '${lane.label} · 主' : lane.label,
                     style: tokens.typography.label.copyWith(
                       color: lane.isMain ? tokens.accent : tokens.muted,
                     ),

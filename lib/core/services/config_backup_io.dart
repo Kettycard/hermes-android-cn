@@ -52,7 +52,7 @@ class ConfigBackupIo {
 
     final result = await SharePlus.instance.share(
       ShareParams(
-        subject: 'Hermes configuration backup',
+        subject: 'Hermes 配置备份',
         files: <XFile>[XFile(file.path, mimeType: 'application/json')],
       ),
     );
@@ -73,7 +73,7 @@ class ConfigBackupIo {
     if (bytes != null) return utf8.decode(bytes, allowMalformed: true);
     final path = picked.path;
     if (path == null) {
-      throw const ConfigBackupException('That file could not be read.');
+      throw const ConfigBackupException('无法读取该文件。');
     }
     return File(path).readAsString();
   }

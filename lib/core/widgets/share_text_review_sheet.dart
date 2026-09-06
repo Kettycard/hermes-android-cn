@@ -5,13 +5,13 @@ import '../theme/hermes_theme.dart';
 import '../utils/new_chat_options.dart';
 
 enum ShareFavoriteAction {
-  useAsIs('Use as is', Icons.edit_note_rounded),
-  summarize('Summarize', Icons.summarize_rounded),
-  explain('Explain', Icons.lightbulb_outline_rounded),
-  research('Research', Icons.travel_explore_rounded),
-  extractTasks('Extract tasks', Icons.task_alt_rounded),
-  remember('Remember', Icons.memory_rounded),
-  fillFromDocument('Fill from document', Icons.description_outlined);
+  useAsIs('原样使用', Icons.edit_note_rounded),
+  summarize('总结', Icons.summarize_rounded),
+  explain('解释', Icons.lightbulb_outline_rounded),
+  research('深入研究', Icons.travel_explore_rounded),
+  extractTasks('提取任务', Icons.task_alt_rounded),
+  remember('记住', Icons.memory_rounded),
+  fillFromDocument('从文档填写', Icons.description_outlined);
 
   final String label;
   final IconData icon;
@@ -26,31 +26,31 @@ String buildSharedPrompt(
   final text = source.trim();
   if (text.isEmpty && hasAttachments) {
     return switch (action) {
-      ShareFavoriteAction.useAsIs => 'Review the attached content.',
-      ShareFavoriteAction.summarize => 'Summarize the attached content.',
-      ShareFavoriteAction.explain => 'Explain the attached content clearly.',
+      ShareFavoriteAction.useAsIs => '查看附带的内容。',
+      ShareFavoriteAction.summarize => '总结附带的内容。',
+      ShareFavoriteAction.explain => '清楚地解释附带的内容。',
       ShareFavoriteAction.research =>
-        'Research the attached content, verify the important claims, and cite sources.',
+        '研究附带的内容，核实重要论断，并注明来源。',
       ShareFavoriteAction.extractTasks =>
-        'Extract the decisions, deadlines, owners, and actionable action items from the attached content.',
+        '从附带的内容中提取决策、截止时间、负责人和可执行的行动项。',
       ShareFavoriteAction.remember =>
-        'Save the durable facts from the attached content to memory, then confirm what was retained.',
+        '把附带内容中持久有用的事实保存到记忆，然后确认保留了哪些内容。',
       ShareFavoriteAction.fillFromDocument =>
-        'Use the attached content to identify and fill the relevant document or form fields. Ask before submitting anything.',
+        '使用附带的内容识别并填写相关文档或表单字段。提交任何内容前请先询问。',
     };
   }
   return switch (action) {
     ShareFavoriteAction.useAsIs => text,
-    ShareFavoriteAction.summarize => 'Summarize this content:\n\n$text',
-    ShareFavoriteAction.explain => 'Explain this content clearly:\n\n$text',
+    ShareFavoriteAction.summarize => '总结以下内容：\n\n$text',
+    ShareFavoriteAction.explain => '清楚地解释以下内容：\n\n$text',
     ShareFavoriteAction.research =>
-      'Research this content, verify the important claims, and cite sources:\n\n$text',
+      '研究以下内容，核实重要论断，并注明来源：\n\n$text',
     ShareFavoriteAction.extractTasks =>
-      'Extract the decisions, deadlines, owners, and actionable action items from this content:\n\n$text',
+      '从以下内容中提取决策、截止时间、负责人和可执行的行动项：\n\n$text',
     ShareFavoriteAction.remember =>
-      'Save the durable facts from this content to memory, then confirm what was retained:\n\n$text',
+      '把以下内容中持久有用的事实保存到记忆，然后确认保留了哪些内容：\n\n$text',
     ShareFavoriteAction.fillFromDocument =>
-      'Use this content to identify and fill the relevant document or form fields. Ask before submitting anything:\n\n$text',
+      '使用以下内容识别并填写相关文档或表单字段。提交任何内容前请先询问：\n\n$text',
   };
 }
 
@@ -99,13 +99,13 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Share to Hermes',
+                      '分享到 Hermes',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: HermesSpacing.sm),
                     Text(
                       widget.sharedText.trim().isEmpty
-                          ? 'No text shared'
+                          ? '没有分享文本'
                           : widget.sharedText,
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,
@@ -114,7 +114,7 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
                     if (widget.sharedFiles.isNotEmpty) ...[
                       const SizedBox(height: HermesSpacing.md),
                       Text(
-                        '${widget.sharedFiles.length} ${widget.sharedFiles.length == 1 ? 'attachment' : 'attachments'}',
+                        '${widget.sharedFiles.length} 个附件',
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       const SizedBox(height: HermesSpacing.xs),
@@ -137,7 +137,7 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
                     ],
                     const SizedBox(height: HermesSpacing.lg),
                     Text(
-                      'Action',
+                      '操作',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: HermesSpacing.sm),
@@ -156,7 +156,7 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
                     ),
                     const SizedBox(height: HermesSpacing.lg),
                     Text(
-                      'Destination',
+                      '目标',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     RadioGroup<NewChatMode>(
@@ -168,17 +168,17 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
                         children: [
                           const RadioListTile<NewChatMode>(
                             contentPadding: EdgeInsets.zero,
-                            title: Text('Quick chat'),
-                            subtitle: Text('Auto-archives after 72 hours'),
+                            title: Text('快捷对话'),
+                            subtitle: Text('72 小时后自动归档'),
                             value: NewChatMode.quickChat,
                           ),
                           RadioListTile<NewChatMode>(
                             contentPadding: EdgeInsets.zero,
-                            title: const Text('Project chat'),
+                            title: const Text('项目对话'),
                             subtitle: Text(
                               widget.projectChatEnabled
-                                  ? 'Choose an active Project next'
-                                  : 'No active Projects on this Gateway',
+                                  ? '下一步选择一个活跃的项目'
+                                  : '此网关上没有活跃的项目',
                             ),
                             value: NewChatMode.projectChat,
                             enabled: widget.projectChatEnabled,
@@ -196,7 +196,7 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+                  child: const Text('取消'),
                 ),
                 const SizedBox(width: HermesSpacing.sm),
                 FilledButton.icon(
@@ -204,7 +204,7 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
                     context,
                   ).pop(ShareTextDecision(action: _action, mode: _mode)),
                   icon: const Icon(Icons.arrow_forward_rounded),
-                  label: const Text('Continue'),
+                  label: const Text('继续'),
                 ),
               ],
             ),

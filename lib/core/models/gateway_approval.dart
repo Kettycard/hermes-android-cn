@@ -90,7 +90,7 @@ class GatewayApprovalRequest {
       command: data['command']?.toString().trim() ?? '',
       description:
           data['description']?.toString().trim() ??
-          'Hermes wants to run a command.',
+          'Hermes 想要执行一个命令。',
       allowPermanent: allowPermanent,
       smartDenied: smartDenied,
       choices: List.unmodifiable(choices),

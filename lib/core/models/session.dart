@@ -44,8 +44,8 @@ class Session {
     final lastActive = (json['last_active'] ?? startedAt).toDouble();
     return Session(
       id: json['id'] ?? '',
-      title: json['title'] ?? 'Untitled',
-      model: json['model'] ?? 'Default',
+      title: json['title'] ?? '未命名',
+      model: json['model'] ?? '默认',
       source: json['source'] ?? '',
       messageCount: json['message_count'] ?? 0,
       isActive: endedAt == null,

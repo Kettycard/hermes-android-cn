@@ -1,0 +1,87 @@
+name: Build Chinese APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and sign APK
+    runs-on: ubuntu-latest
+
+    env:
+      HAS_RELEASE_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Static analysis
+        run: flutter analyze --no-pub
+
+      - name: Set up release keystore (from secrets)
+        if: env.HAS_RELEASE_KEYSTORE == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
+          echo "storePassword=$STORE_PASSWORD" > key.properties
+          echo "keyPassword=$KEY_PASSWORD" >> key.properties
+          echo "keyAlias=$KEY_ALIAS" >> key.properties
+          echo "storeFile=${{ github.workspace }}/release.keystore" >> key.properties
+
+      - name: Set up release keystore (generated, first run only)
+        if: env.HAS_RELEASE_KEYSTORE != 'true'
+        run: |
+          keytool -genkeypair -v \
+            -keystore release.keystore \
+            -storetype PKCS12 \
+            -alias hermes-zh \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass hermes-zh-build -keypass hermes-zh-build \
+            -dname "CN=Hermes Android ZH, OU=Personal, O=Personal, L=Local, ST=Local, C=CN"
+          echo "storePassword=hermes-zh-build" > key.properties
+          echo "keyPassword=hermes-zh-build" >> key.properties
+          echo "keyAlias=hermes-zh" >> key.properties
+          echo "storeFile=${{ github.workspace }}/release.keystore" >> key.properties
+          echo "::notice::Ephemeral keystore generated. Download the release.keystore artifact and add KEYSTORE_BASE64 / STORE_PASSWORD / KEY_PASSWORD / KEY_ALIAS secrets to keep a stable signature."
+
+      - name: Build APK (release, split per ABI)
+        run: flutter build apk --release --split-per-abi
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes-zh-apks
+          path: build/app/outputs/flutter-apk/app-*-release.apk
+          retention-days: 30
+
+      - name: Upload keystore (only when generated)
+        if: env.HAS_RELEASE_KEYSTORE != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-keystore
+          path: release.keystore
+          retention-days: 30

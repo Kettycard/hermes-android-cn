@@ -21,8 +21,8 @@ class GatewayReasoningCard extends StatelessWidget {
         key: PageStorageKey<String>('gateway-reasoning-${text.hashCode}'),
         initiallyExpanded: initiallyExpanded,
         leading: const Icon(Icons.psychology_outlined),
-        title: const Text('Reasoning'),
-        subtitle: const Text('Hermes reasoning details'),
+        title: const Text('推理'),
+        subtitle: const Text('Hermes 推理详情'),
         children: [
           const Divider(height: 1),
           SelectionArea(
@@ -99,8 +99,8 @@ class GatewaySubagentCard extends StatelessWidget {
         ),
         title: Text(
           complete
-              ? '${activities.length} delegated task(s) completed'
-              : '${activities.where((item) => !item.isComplete).length} delegated task(s) active',
+              ? '${activities.length} 个委派任务已完成'
+              : '${activities.where((item) => !item.isComplete).length} 个委派任务进行中',
         ),
         children: [
           for (final activity in activities)

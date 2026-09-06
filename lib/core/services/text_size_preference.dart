@@ -8,11 +8,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// from 0.90 to 1.30 so the app can offer a predictable adjustment without
 /// disabling the system accessibility setting.
 enum TextSizePreference {
-  system('system', 'System', 1.0),
-  small('small', 'Small', 0.90),
-  standard('default', 'Default', 1.0),
-  large('large', 'Large', 1.15),
-  extraLarge('extra_large', 'Extra large', 1.30);
+  system('system', '跟随系统', 1.0),
+  small('small', '小', 0.90),
+  standard('default', '默认', 1.0),
+  large('large', '大', 1.15),
+  extraLarge('extra_large', '特大', 1.30);
 
   const TextSizePreference(this.storageValue, this.label, this.multiplier);
 
@@ -27,8 +27,8 @@ enum TextSizePreference {
   bool get followsSystemExactly => this == TextSizePreference.system;
 
   String get description => followsSystemExactly
-      ? 'Use Android accessibility text size exactly.'
-      : '${(multiplier * 100).round()}% of the Android text size.';
+      ? '严格使用 Android 无障碍文字大小。'
+      : '${(multiplier * 100).round()}% 的 Android 文字大小。';
 
   static TextSizePreference fromStorage(String? value) {
     return TextSizePreference.values.firstWhere(

@@ -113,10 +113,9 @@ class ActivityPaneState extends State<ActivityPane> {
     if (feed == null) {
       if (_error != null) {
         return ErrorState(
-          title: 'Could not read activity',
+          title: '无法读取活动',
           message:
-              'Activity reads the durable turn journal to know what Hermes is '
-              'doing. Check that the gateway is reachable, then try again.',
+              'Activity 通过持久的轮次日志了解 Hermes 当前的工作。请确认网关可连接后重试。',
           onRetry: _load,
         );
       }
@@ -153,12 +152,11 @@ class ActivityPaneState extends State<ActivityPane> {
                     ? Icons.inbox_outlined
                     : Icons.bolt_outlined,
                 title: widget.actionableOnly
-                    ? 'Inbox is clear'
-                    : 'Nothing is running',
+                    ? '收件箱已清空'
+                    : '当前没有运行中的任务',
                 message: widget.actionableOnly
-                    ? 'No turn needs your input or has failed.'
-                    : 'No turn is blocked, in flight, or recently finished. '
-                          'Work you start will show up here.',
+                    ? '没有需要你处理或已失败的任务。'
+                    : '没有任务被阻塞、进行中或刚刚完成。你开始的工作会显示在这里。',
               ),
             )
           else
@@ -210,7 +208,7 @@ class _OverflowNote extends StatelessWidget {
         HermesSpacing.lg,
       ),
       child: Text(
-        'and $count more',
+        '还有 $count 条',
         style: tokens.typography.label.copyWith(color: tokens.muted),
       ),
     );
@@ -240,7 +238,7 @@ class _OfflineBanner extends StatelessWidget {
             const SizedBox(width: HermesSpacing.sm),
             Expanded(
               child: Text(
-                'Offline — showing the last known activity.',
+                '已离线 — 显示最近一次已知的活动。',
                 style: tokens.typography.label.copyWith(color: tokens.muted),
               ),
             ),
@@ -280,7 +278,7 @@ class _ActivityItemCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  title == null || title.isEmpty ? 'Untitled chat' : title,
+                  title == null || title.isEmpty ? '未命名对话' : title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: tokens.typography.section.copyWith(
@@ -326,8 +324,8 @@ class _ActivityItemCard extends StatelessWidget {
 /// negative duration.
 String formatActivityAge(DateTime updatedAt, DateTime now) {
   final elapsed = now.difference(updatedAt);
-  if (elapsed.isNegative || elapsed.inMinutes < 1) return 'now';
-  if (elapsed.inMinutes < 60) return '${elapsed.inMinutes}m ago';
-  if (elapsed.inHours < 24) return '${elapsed.inHours}h ago';
-  return '${elapsed.inDays}d ago';
+  if (elapsed.isNegative || elapsed.inMinutes < 1) return '刚刚';
+  if (elapsed.inMinutes < 60) return '${elapsed.inMinutes} 分钟前';
+  if (elapsed.inHours < 24) return '${elapsed.inHours} 小时前';
+  return '${elapsed.inDays} 天前';
 }

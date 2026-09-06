@@ -75,7 +75,7 @@ class _GatewayClarifyDialogState extends State<GatewayClarifyDialog> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = 'Hermes could not accept the answer. Please try again.';
+        _error = 'Hermes 无法接受该回答，请重试。';
       });
     }
   }
@@ -88,7 +88,7 @@ class _GatewayClarifyDialogState extends State<GatewayClarifyDialog> {
 
     return AlertDialog(
       icon: const Icon(Icons.help_outline_rounded),
-      title: const Text('Hermes needs your input'),
+      title: const Text('Hermes 需要你的输入'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560, maxHeight: 620),
         child: SingleChildScrollView(
@@ -105,8 +105,8 @@ class _GatewayClarifyDialogState extends State<GatewayClarifyDialog> {
                 const SizedBox(height: 12),
                 Text(
                   request.multiSelect
-                      ? 'Select one or more options, then continue.'
-                      : 'Select one option, or enter another answer.',
+                      ? '选择一个或多个选项，然后继续。'
+                      : '选择一个选项，或输入其他回答。',
                   style: theme.textTheme.bodySmall,
                 ),
                 const SizedBox(height: 6),
@@ -148,8 +148,8 @@ class _GatewayClarifyDialogState extends State<GatewayClarifyDialog> {
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
                   labelText: request.hasChoices
-                      ? 'Other answer'
-                      : 'Your answer',
+                      ? '其他回答'
+                      : '你的回答',
                 ),
                 onChanged: (value) {
                   setState(() {
@@ -182,7 +182,7 @@ class _GatewayClarifyDialogState extends State<GatewayClarifyDialog> {
         TextButton(
           key: const Key('clarify-skip'),
           onPressed: _submitting ? null : () => _respond(''),
-          child: const Text('Skip'),
+          child: const Text('跳过'),
         ),
         FilledButton(
           key: const Key('clarify-continue'),
@@ -194,7 +194,7 @@ class _GatewayClarifyDialogState extends State<GatewayClarifyDialog> {
                   dimension: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Continue'),
+              : const Text('继续'),
         ),
       ],
     );

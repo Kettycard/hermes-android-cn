@@ -69,20 +69,20 @@ class _ModelSelection {
 }
 
 const _reasoningEffortLabels = <String, String>{
-  'none': 'Off (no thinking)',
-  'minimal': 'Minimal',
-  'low': 'Low',
-  'medium': 'Medium',
-  'high': 'High',
-  'xhigh': 'Extra High',
-  'max': 'Max',
-  'ultra': 'Ultra',
+  'none': '关闭（不思考）',
+  'minimal': '最少',
+  'low': '低',
+  'medium': '中',
+  'high': '高',
+  'xhigh': '极高',
+  'max': '最大',
+  'ultra': '超强',
 };
 
 enum _ResponseTransport { none, rest, desktop }
 
 const _legacyTransportNotice =
-    'Background recovery unavailable — legacy transport';
+    '后台恢复不可用 — 旧版传输方式';
 
 @visibleForTesting
 typedef TestRemotePromptSubmit =
@@ -445,7 +445,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ).trim();
       if (content.isEmpty) continue;
       buffer
-        ..writeln(role == 'user' ? '## You' : '## Hermes')
+        ..writeln(role == 'user' ? '## 你' : '## Hermes')
         ..writeln()
         ..writeln(content)
         ..writeln();
@@ -490,7 +490,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() => _voiceStatus = 'Voice setup failed: $e');
+      setState(() => _voiceStatus = '语音设置失败：$e');
     }
   }
 
@@ -507,7 +507,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           content: Text(
             _voiceComposer.status ??
                 _voiceStatus ??
-                'Speech recognition is unavailable',
+                '语音识别不可用',
           ),
         ),
       );
@@ -532,7 +532,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Reading response aloud'),
+            content: Text('正在朗读回复'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -547,7 +547,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Read aloud is unavailable on this device'),
+            content: Text('此设备不支持朗读'),
             duration: Duration(seconds: 3),
           ),
         );
@@ -558,8 +558,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (!mounted || !_appInBackground) return;
     final turnId = state.turnId ?? state.clientTurnId;
     final summary = state.isTerminal && !state.isFailClosed
-        ? 'Response ready'
-        : 'Turn completed';
+      ? '回复已就绪'
+      : '轮次已完成';
     unawaited(
       _turnNotifications.showTurnCompleted(
         turnSummary: '${widget.session.title}: $summary',
@@ -768,7 +768,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _sending = true;
         _gatewayTurnStatus = const GatewayTurnStatus(
           kind: 'recovery',
-          text: 'Recovering Hermes…',
+          text: '正在恢复 Hermes…',
         );
       });
     }
@@ -806,7 +806,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       setState(() {
         _gatewayTurnStatus = GatewayTurnStatus(
           kind: 'recovery',
-          text: 'Hermes recovery is unavailable: $error',
+          text: 'Hermes 恢复不可用：$error',
         );
       });
     } finally {
@@ -870,7 +870,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         _gatewayTurnStatus = projection.isFailClosed
             ? const GatewayTurnStatus(
                 kind: 'recovery_failed',
-                text: 'Hermes stopped recovery safely. No prompt was resent.',
+                text: 'Hermes 已安全停止恢复，未重新发送任何提示。',
               )
             : null;
       }
@@ -920,9 +920,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   String _gatewayRecoveryStatusText(GatewayRecoveryTurnStatus? status) {
     return switch (status) {
-      GatewayRecoveryTurnStatus.waitingInput => 'Hermes is waiting for input…',
-      GatewayRecoveryTurnStatus.running => 'Hermes is responding…',
-      _ => 'Recovering Hermes…',
+      GatewayRecoveryTurnStatus.waitingInput => 'Hermes 正在等待输入…',
+      GatewayRecoveryTurnStatus.running => 'Hermes 正在回复…',
+      _ => '正在恢复 Hermes…',
     };
   }
 
@@ -968,7 +968,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
               title: Text(
-                _desktopGateway == null ? 'Choose image' : 'Choose images',
+                _desktopGateway == null ? '选择图片' : '选择图片',
               ),
               onTap: () {
                 Navigator.pop(sheetContext);
@@ -977,7 +977,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ),
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Take photo'),
+              title: const Text('拍照'),
               onTap: () {
                 Navigator.pop(sheetContext);
                 _pickCameraImage();
@@ -985,8 +985,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ),
             ListTile(
               leading: const Icon(Icons.cloud_outlined),
-              title: const Text('Browse server files'),
-              subtitle: const Text('Insert a remote @file reference'),
+              title: const Text('浏览服务器文件'),
+              subtitle: const Text('插入远程 @file 引用'),
               onTap: () {
                 Navigator.pop(sheetContext);
                 unawaited(_pickServerFile());
@@ -995,9 +995,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             if (_desktopGateway != null)
               ListTile(
                 leading: const Icon(Icons.description_outlined),
-                title: const Text('Choose files'),
+                title: const Text('选择文件'),
                 subtitle: const Text(
-                  'Documents, archives, audio, video, or data',
+                  '文档、压缩包、音频、视频或数据',
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
@@ -1064,7 +1064,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
       if (images.isNotEmpty) await _preparePickedImages(images);
     } catch (_) {
-      _showAttachmentError('Unable to prepare this image. Try another one.');
+      _showAttachmentError('无法准备此图片，请换一张。');
     }
   }
 
@@ -1078,7 +1078,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
       if (image != null) await _preparePickedImages([image]);
     } catch (_) {
-      _showAttachmentError('Unable to prepare this image. Try another one.');
+      _showAttachmentError('无法准备此图片，请换一张。');
     }
   }
 
@@ -1088,7 +1088,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     final files = response.files;
     if (files == null || files.isEmpty) {
-      _showAttachmentError('Image selection was interrupted. Try again.');
+      _showAttachmentError('图片选择已中断，请重试。');
       return;
     }
 
@@ -1116,7 +1116,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       } on AttachmentDraftException catch (error) {
         errors.add(error.message);
       } catch (_) {
-        errors.add('Unable to prepare ${image.name}.');
+        errors.add('无法准备 ${image.name}。');
       }
     }
     if (!mounted) {
@@ -1144,7 +1144,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _pickFiles() async {
     if (_desktopGateway == null) {
       _showAttachmentError(
-        'Configure a valid Desktop Gateway URL before attaching files.',
+        '附加文件前请先配置有效的 Desktop Gateway URL。',
       );
       return;
     }
@@ -1159,7 +1159,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final available = maxRemoteAttachmentDrafts - _attachmentDrafts.length;
       if (available <= 0) {
         _showAttachmentError(
-          'You can attach up to $maxRemoteAttachmentDrafts items.',
+          '最多可附加 $maxRemoteAttachmentDrafts 个附件。',
         );
         return;
       }
@@ -1190,11 +1190,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       setState(() => _attachmentDrafts.addAll(prepared));
       if (files.length > available || rejected > 0) {
         _showAttachmentError(
-          '${files.length - prepared.length} file(s) skipped: limit, size, unreadable, or sensitive filename.',
+          '${files.length - prepared.length} 个文件已跳过：超出限制、体积过大、无法读取或文件名敏感。',
         );
       }
     } catch (_) {
-      _showAttachmentError('Unable to prepare this file. Try another one.');
+      _showAttachmentError('无法准备此文件，请换一个。');
     }
   }
 
@@ -1247,7 +1247,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _sending = true;
       _gatewayTurnStatus = GatewayTurnStatus(
         kind: 'upload',
-        text: 'Retrying ${draft.name}…',
+        text: '正在重试 ${draft.name}…',
       );
     });
     try {
@@ -1264,14 +1264,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'File attached; document catalog registration is pending.',
+              '文件已附加，文档目录注册待处理。',
             ),
           ),
         );
       }
     } catch (error) {
       _showAttachmentError(
-        'Retry failed for ${draft.name}. The draft and prompt were kept.',
+        '重试 ${draft.name} 失败。已保留草稿和提示。',
       );
     } finally {
       if (mounted) {
@@ -1289,7 +1289,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Configure Dashboard credentials to choose a chat model.',
+            '请配置 Dashboard 凭据以选择对话模型。',
           ),
         ),
       );
@@ -1343,9 +1343,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.tune),
-                    title: const Text('Model and thinking for this chat'),
+                    title: const Text('本对话的模型与思考'),
                     subtitle: Text(
-                      'Profile default: ${modelInfo['model'] ?? 'unknown'}'
+                      '配置默认：${modelInfo['model'] ?? '未知'}'
                       '${modelInfo['provider'] == null ? '' : ' • ${modelInfo['provider']}'}',
                     ),
                   ),
@@ -1353,7 +1353,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                     child: InputDecorator(
                       decoration: const InputDecoration(
-                        labelText: 'Thinking effort',
+                        labelText: '思考强度',
                         border: OutlineInputBorder(),
                       ),
                       child: DropdownButtonHideUnderline(
@@ -1410,7 +1410,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       children: [
                         TextButton(
                           onPressed: () => Navigator.pop(sheetContext),
-                          child: const Text('Cancel'),
+                          child: const Text('取消'),
                         ),
                         const SizedBox(width: 8),
                         FilledButton(
@@ -1421,7 +1421,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                               reasoningEffort: selectedEffort,
                             ),
                           ),
-                          child: const Text('Apply to this chat'),
+                          child: const Text('应用到本对话'),
                         ),
                       ],
                     ),
@@ -1439,7 +1439,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not load models for this profile: $error'),
+          content: Text('无法加载此配置的模型：$error'),
         ),
       );
     } finally {
@@ -1507,8 +1507,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${choice.model} • ${_reasoningEffortLabels[selection.reasoningEffort]} '
-            'now apply only to this chat.',
+            '${choice.model} • ${_reasoningEffortLabels[selection.reasoningEffort]} 已仅应用于本对话。',
           ),
         ),
       );
@@ -1516,7 +1515,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Model was not changed: $error')));
+      ).showSnackBar(SnackBar(content: Text('模型未更改：$error')));
     } finally {
       if (mounted) setState(() => _changingModel = false);
     }
@@ -1566,7 +1565,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       } catch (_) {
         if (mounted) setState(() => _sending = false);
         _showAttachmentError(
-          'Unable to read the selected image. The selection was kept.',
+          '无法读取所选图片，已保留选择。',
         );
         return;
       }
@@ -1598,7 +1597,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _streaming = true;
       _gatewayTurnStatus = const GatewayTurnStatus(
         kind: 'starting',
-        text: 'Starting Hermes…',
+        text: '正在启动 Hermes…',
       );
       _messages.add({'role': 'user', 'content': localContent});
       // Insert a placeholder streaming message
@@ -1699,7 +1698,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final testRemotePromptSubmit = widget.testRemotePromptSubmit;
     if (desktopGateway == null && testRemotePromptSubmit == null) {
       _showAttachmentError(
-        'Desktop Gateway is not configured for this connection.',
+        '此连接未配置 Desktop Gateway。',
       );
       return;
     }
@@ -1719,7 +1718,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _sending = true;
       _gatewayTurnStatus = const GatewayTurnStatus(
         kind: 'upload',
-        text: 'Preparing attachments…',
+        text: '正在准备附件…',
       );
     });
 
@@ -1748,7 +1747,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               _gatewayTurnStatus = GatewayTurnStatus(
                 kind: 'upload',
                 text:
-                    'Uploading ${index + 1}/${attachments.length}: ${draft.name}',
+                    '正在上传 ${index + 1}/${attachments.length}：${draft.name}',
               );
             }
           });
@@ -1759,7 +1758,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'File attached; document catalog registration is pending.',
+                  '文件已附加，文档目录注册待处理。',
                 ),
               ),
             );
@@ -1781,7 +1780,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             _streaming = true;
             _gatewayTurnStatus = const GatewayTurnStatus(
               kind: 'starting',
-              text: 'Starting Hermes…',
+              text: '正在启动 Hermes…',
             );
             _attachmentDrafts.clear();
             _messages.add({'role': 'user', 'content': localContent});
@@ -1890,7 +1889,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _sending = true;
       _gatewayTurnStatus = const GatewayTurnStatus(
         kind: 'upload',
-        text: 'Preparing attachments…',
+        text: '正在准备附件…',
       );
     });
 
@@ -1903,7 +1902,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ..error = null;
           _gatewayTurnStatus = GatewayTurnStatus(
             kind: 'upload',
-            text: 'Uploading ${index + 1}/${attachments.length}: ${draft.name}',
+            text: '正在上传 ${index + 1}/${attachments.length}：${draft.name}',
           );
         });
         final dataUrl = await _attachmentDraftService.readDataUrl(draft);
@@ -1956,7 +1955,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _streaming = true;
       _gatewayTurnStatus = const GatewayTurnStatus(
         kind: 'starting',
-        text: 'Starting Hermes…',
+        text: '正在启动 Hermes…',
       );
       _attachmentDrafts.clear();
       _messages.add({'role': 'user', 'content': localContent});
@@ -2006,7 +2005,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       setState(() {
         _gatewayTurnStatus = const GatewayTurnStatus(
           kind: 'recovery',
-          text: 'Delivery is uncertain; recovering without resending…',
+          text: '投递结果不确定，正在恢复且不重发…',
         );
       });
       await _recoverPendingTurn();
@@ -2194,7 +2193,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (!update.isComplete) {
         _gatewayTurnStatus = GatewayTurnStatus(
           kind: 'subagent',
-          text: 'Delegated task: ${update.goal}',
+          text: '委派任务：${update.goal}',
         );
       }
     });
@@ -2249,7 +2248,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Could not deny the command: $error'),
+              content: Text('无法拒绝该命令：$error'),
               backgroundColor: Colors.orange,
             ),
           );
@@ -2460,7 +2459,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Could not skip the Hermes question.'),
+              content: Text('无法跳过 Hermes 的提问。'),
               backgroundColor: Colors.orange,
             ),
           );
@@ -2513,8 +2512,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         SnackBar(
           content: Text(
             interrupted
-                ? 'Response stopped.'
-                : 'Response closed locally; no active gateway turn was found.',
+                ? '已停止回复。'
+                : '已在本地关闭回复；未找到进行中的网关轮次。',
           ),
         ),
       );
@@ -2522,7 +2521,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Response closed locally; gateway stop failed: $error'),
+          content: Text('已在本地关闭回复；网关停止失败：$error'),
           backgroundColor: Colors.orange,
           duration: const Duration(seconds: 6),
         ),
@@ -2548,7 +2547,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Send failed: $e'),
+          content: Text('发送失败：$e'),
           backgroundColor: Colors.orange,
           duration: const Duration(seconds: 6),
         ),
@@ -2584,7 +2583,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         kind: 'tool',
         text: update.isTerminal
             ? '${update.displayName}: ${update.statusLabel.toLowerCase()}'
-            : 'Using ${update.displayName}…',
+            : '正在使用 ${update.displayName}…',
       );
     });
 
@@ -2613,7 +2612,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         centerTitle: false,
         title: Text(
           widget.session.title.trim().isEmpty
-              ? 'Untitled chat'
+              ? '未命名对话'
               : widget.session.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -2647,7 +2646,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             )
           else
             PopupMenuButton<String>(
-              tooltip: 'Chat actions',
+              tooltip: '对话操作',
               onSelected: (action) {
                 if (action == 'refresh') _fetchMessages();
                 if (action == 'export') _exportConversation();
@@ -2657,14 +2656,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   value: 'refresh',
                   child: ListTile(
                     leading: Icon(Icons.refresh),
-                    title: Text('Refresh'),
+                    title: Text('刷新'),
                   ),
                 ),
                 PopupMenuItem(
                   value: 'export',
                   child: ListTile(
                     leading: Icon(Icons.ios_share_outlined),
-                    title: Text('Export / share'),
+                    title: Text('导出 / 分享'),
                   ),
                 ),
               ],
@@ -2741,7 +2740,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             _notificationTimers.remove(notification.key)?.cancel();
             setState(() => _gatewayNotifications.remove(notification.key));
           },
-          child: const Text('Dismiss'),
+          child: const Text('关闭'),
         ),
       ],
     );
@@ -2798,7 +2797,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
                 child: Semantics(
-                  label: 'Choose chat model',
+                  label: '选择对话模型',
                   value: _sessionModel ?? widget.session.model,
                   button: true,
                   enabled:
@@ -2826,7 +2825,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           : const Icon(Icons.tune, size: 18),
                       label: Text(
                         '${_sessionModel ?? widget.session.model} • '
-                        '${_sessionModelOverride ? 'this chat' : 'profile default'}',
+                        '${_sessionModelOverride ? '本对话' : '配置默认'}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -2845,7 +2844,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Semantics(
-                  label: 'Attachment drafts',
+                  label: '附件草稿',
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       maxHeight: MediaQuery.sizeOf(context).height * 0.32,
@@ -2880,7 +2879,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             Row(
               children: [
                 Semantics(
-                  label: 'Add attachment',
+                  label: '添加附件',
                   button: true,
                   enabled: !_loading && !_streaming && !_sending,
                   excludeSemantics: true,
@@ -2889,7 +2888,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     onPressed: (!_loading && !_streaming && !_sending)
                         ? _showAttachmentPicker
                         : null,
-                    tooltip: 'Attach image or file',
+                    tooltip: '附加图片或文件',
                     constraints: const BoxConstraints.tightFor(
                       width: 48,
                       height: 48,
@@ -2898,13 +2897,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
                 Expanded(
                   child: Semantics(
-                    label: 'Message',
+                    label: '消息',
                     textField: true,
                     child: TextField(
                       key: const Key('chat-message-composer'),
                       controller: _textController,
                       decoration: InputDecoration(
-                        hintText: 'Message Hermes…',
+                        hintText: '给 Hermes 发消息…',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(24),
                         ),
@@ -2931,8 +2930,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     onPressed: _startVoiceInput,
                   ),
                 Semantics(
-                  label: 'Spoken replies',
-                  value: _voiceReplyEnabled ? 'On' : 'Off',
+                  label: '语音回复',
+                  value: _voiceReplyEnabled ? '开' : '关',
                   toggled: _voiceReplyEnabled,
                   button: true,
                   excludeSemantics: true,
@@ -2947,8 +2946,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       }
                     },
                     tooltip: _voiceReplyEnabled
-                        ? 'Spoken replies on'
-                        : 'Spoken replies off',
+                        ? '语音回复已开启'
+                        : '语音回复已关闭',
                     constraints: const BoxConstraints.tightFor(
                       width: 48,
                       height: 48,
@@ -2957,7 +2956,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
                 const SizedBox(width: 4),
                 Semantics(
-                  label: _streaming ? 'Stop response' : 'Send message',
+                  label: _streaming ? '停止回复' : '发送消息',
                   button: true,
                   enabled:
                       _streaming ||
@@ -2974,7 +2973,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           ? IconButton(
                               icon: const Icon(Icons.stop_rounded, size: 20),
                               onPressed: _stopResponse,
-                              tooltip: 'Stop response',
+                              tooltip: '停止回复',
                               constraints: const BoxConstraints.tightFor(
                                 width: 48,
                                 height: 48,
@@ -2988,7 +2987,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                       _voiceComposer.listening
                                   ? null
                                   : _sendMessage,
-                              tooltip: 'Send',
+                              tooltip: '发送',
                               constraints: const BoxConstraints.tightFor(
                                 width: 48,
                                 height: 48,
@@ -3020,7 +3019,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               const Icon(Icons.warning_amber, size: 48, color: Colors.orange),
               const SizedBox(height: 16),
               Text(
-                'Failed to load messages',
+                '加载消息失败',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
@@ -3032,7 +3031,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _fetchMessages,
-                child: const Text('Retry'),
+                child: const Text('重试'),
               ),
             ],
           ),
@@ -3157,7 +3156,7 @@ class MessageBubble extends StatelessWidget {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
-          content: Text('Message copied'),
+          content: Text('已复制消息'),
           duration: Duration(seconds: 2),
         ),
       );
@@ -3244,14 +3243,14 @@ class MessageBubble extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
                 child: Text(
-                  'Message actions',
+                  '消息操作',
                   style: Theme.of(sheetContext).textTheme.titleSmall,
                 ),
               ),
               _actionTile(
                 sheetContext,
-                label: 'Copy message',
-                tooltip: 'Copy message',
+                label: '复制消息',
+                tooltip: '复制消息',
                 icon: Icons.copy_outlined,
                 onTap: () {
                   Navigator.of(sheetContext).pop();
@@ -3261,8 +3260,8 @@ class MessageBubble extends StatelessWidget {
               if (onReadAloud != null)
                 _actionTile(
                   sheetContext,
-                  label: 'Read aloud',
-                  tooltip: 'Read aloud',
+                  label: '朗读',
+                  tooltip: '朗读',
                   icon: Icons.volume_up_outlined,
                   onTap: () {
                     Navigator.of(sheetContext).pop();
@@ -3272,8 +3271,8 @@ class MessageBubble extends StatelessWidget {
               if (onEdit != null)
                 _actionTile(
                   sheetContext,
-                  label: 'Edit and resend',
-                  tooltip: 'Edit and resend',
+                  label: '编辑并重发',
+                  tooltip: '编辑并重发',
                   icon: Icons.edit_outlined,
                   onTap: () {
                     Navigator.of(sheetContext).pop();
@@ -3283,8 +3282,8 @@ class MessageBubble extends StatelessWidget {
               if (onRetry != null)
                 _actionTile(
                   sheetContext,
-                  label: 'Regenerate response',
-                  tooltip: 'Regenerate response',
+                  label: '重新生成回复',
+                  tooltip: '重新生成回复',
                   icon: Icons.refresh,
                   onTap: () {
                     Navigator.of(sheetContext).pop();
@@ -3373,7 +3372,7 @@ class MessageBubble extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Text(
-                isUser ? 'You' : 'Hermes',
+                isUser ? '你' : 'Hermes',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: isUser
                       ? hermesUserMessageForeground.withValues(alpha: 0.75)

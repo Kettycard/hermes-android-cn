@@ -86,11 +86,11 @@ String _contentPartToText(dynamic part) {
 
   final type = part['type']?.toString() ?? 'unknown';
   if (type.contains('image') || part.containsKey('image_url')) {
-    return '[Image]';
+    return '[图片]';
   }
   if (type.contains('file') || part.containsKey('file')) {
-    return '[File]';
+    return '[文件]';
   }
 
-  return '[Unsupported content: $type]';
+  return '[不支持的内容：$type]';
 }

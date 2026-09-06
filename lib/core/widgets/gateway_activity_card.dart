@@ -35,10 +35,10 @@ class _GatewayActivityCardState extends State<GatewayActivityCard> {
     final active = activities.any((activity) => !activity.isTerminal);
     final failures = activities.where((activity) => activity.isFailed).length;
     final subtitle = active
-        ? 'Hermes is using ${activities.length == 1 ? 'a tool' : '${activities.length} tools'}'
+        ? 'Hermes 正在使用${activities.length == 1 ? '一个工具' : '${activities.length} 个工具'}'
         : failures > 0
-        ? '$failures failed • ${activities.length} total'
-        : '${activities.length} completed';
+        ? '$failures 个失败 • 共 ${activities.length} 个'
+        : '${activities.length} 个已完成';
 
     final cardStatus = active
         ? HermesStatus.running
@@ -78,7 +78,7 @@ class _GatewayActivityCardState extends State<GatewayActivityCard> {
                           ? Theme.of(context).colorScheme.error
                           : Theme.of(context).colorScheme.primary,
                     ),
-              title: const Text('Tool activity'),
+              title: const Text('工具活动'),
               subtitle: Text(subtitle),
               children: [
                 const Divider(height: 1),

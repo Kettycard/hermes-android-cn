@@ -56,14 +56,13 @@ class ConfigBackup {
   factory ConfigBackup.fromJson(Map<String, dynamic> json) {
     if (json['format'] != format) {
       throw const ConfigBackupException(
-        'This file is not a Hermes configuration backup.',
+        '此文件不是 Hermes 配置备份。',
       );
     }
     final version = json['version'];
     if (version is! int || version < 1 || version > currentVersion) {
       throw const ConfigBackupException(
-        'This backup was made by a newer version of the app and cannot be '
-        'imported.',
+        '此备份由更新版本的应用创建，无法导入。',
       );
     }
 
@@ -90,7 +89,7 @@ class ConfigBackup {
       rethrow;
     } catch (_) {
       throw const ConfigBackupException(
-        'This backup file is damaged and could not be read.',
+        '此备份文件已损坏，无法读取。',
       );
     }
   }
@@ -156,7 +155,7 @@ class ConfigBackup {
       return <String, dynamic>{'type': 'string_list', 'value': value};
     }
     throw const ConfigBackupException(
-      'A saved preference has an unsupported type and cannot be exported.',
+      '某个已保存的偏好设置类型不受支持，无法导出。',
     );
   }
 
@@ -183,7 +182,7 @@ class ConfigBackup {
         break;
     }
     throw const ConfigBackupException(
-      'This backup file is damaged and could not be read.',
+      '此备份文件已损坏，无法读取。',
     );
   }
 }
@@ -211,12 +210,12 @@ class ConfigBackupCodec {
   }) async {
     if (passphrase.trim().isEmpty) {
       throw const ConfigBackupException(
-        'Choose a passphrase — the backup contains your API keys.',
+        '请设置密码——备份中包含你的 API 密钥。',
       );
     }
     if (iterations < 1 || iterations > _maxIterations) {
       throw const ConfigBackupException(
-        'The backup could not be protected safely.',
+        '无法安全地保护备份。',
       );
     }
 
@@ -234,7 +233,7 @@ class ConfigBackupCodec {
       );
     } catch (_) {
       throw const ConfigBackupException(
-        'The backup could not be protected safely.',
+        '无法安全地保护备份。',
       );
     }
 
@@ -264,20 +263,19 @@ class ConfigBackupCodec {
       envelope = jsonDecode(armored) as Map<String, dynamic>;
     } catch (_) {
       throw const ConfigBackupException(
-        'This file is not a Hermes configuration backup.',
+        '此文件不是 Hermes 配置备份。',
       );
     }
 
     if (envelope['format'] != envelopeFormat) {
       throw const ConfigBackupException(
-        'This file is not a Hermes configuration backup.',
+        '此文件不是 Hermes 配置备份。',
       );
     }
     final version = envelope['version'];
     if (version is! int || version < 1 || version > envelopeVersion) {
       throw const ConfigBackupException(
-        'This backup was made by a newer version of the app and cannot be '
-        'imported.',
+        '此备份由更新版本的应用创建，无法导入。',
       );
     }
 
@@ -292,7 +290,7 @@ class ConfigBackupCodec {
       if (kdf['algorithm'] != 'pbkdf2-hmac-sha256' ||
           cipher['algorithm'] != 'aes-256-gcm') {
         throw const ConfigBackupException(
-          'This backup uses an unsupported encryption scheme.',
+          '此备份使用了不受支持的加密方案。',
         );
       }
       iterations = kdf['iterations'] as int;
@@ -304,7 +302,7 @@ class ConfigBackupCodec {
       rethrow;
     } catch (_) {
       throw const ConfigBackupException(
-        'This backup file is damaged and could not be read.',
+        '此备份文件已损坏，无法读取。',
       );
     }
 
@@ -312,7 +310,7 @@ class ConfigBackupCodec {
     // an unbounded amount of key-stretching work.
     if (iterations < 1 || iterations > _maxIterations) {
       throw const ConfigBackupException(
-        'This backup file is damaged and could not be read.',
+        '此备份文件已损坏，无法读取。',
       );
     }
 
@@ -328,7 +326,7 @@ class ConfigBackupCodec {
       // Wrong passphrase and tampered ciphertext are indistinguishable here by
       // design — both fail the GCM authentication tag.
       throw const ConfigBackupException(
-        'Wrong passphrase, or this backup file has been altered.',
+        '密码错误，或此备份文件已被篡改。',
       );
     }
 
@@ -340,7 +338,7 @@ class ConfigBackupCodec {
       rethrow;
     } catch (_) {
       throw const ConfigBackupException(
-        'This backup file is damaged and could not be read.',
+        '此备份文件已损坏，无法读取。',
       );
     }
   }
