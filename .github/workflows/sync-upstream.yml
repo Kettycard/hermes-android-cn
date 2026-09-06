@@ -1,0 +1,101 @@
+name: Sync Upstream
+
+# 每天北京时间 18:00 检查上游更新；合并成功后自动调用 Build Chinese APK 构建新版本。
+# 若合并产生冲突（汉化文件与上游改动重叠），则中止合并并开 issue 提醒手动处理。
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 10 * * *'
+
+permissions:
+  contents: write
+  issues: write
+
+env:
+  UPSTREAM_REPO: https://github.com/rusty4444/hermes-android.git
+
+jobs:
+  sync:
+    name: Merge upstream/main
+    runs-on: ubuntu-latest
+
+    outputs:
+      synced: ${{ steps.merge.outputs.synced }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "hermes-zh-sync-bot"
+          git config user.email "actions@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream "$UPSTREAM_REPO"
+          git fetch upstream main --tags
+          echo "upstream head: $(git rev-parse --short upstream/main)"
+
+      - name: Merge upstream into localized main
+        id: merge
+        run: |
+          set -euo pipefail
+          ahead=$(git rev-list --count main..upstream/main || true)
+          echo "upstream ahead by $ahead commit(s)"
+          if [ "$ahead" = "0" ]; then
+            echo "synced=false" >> "$GITHUB_OUTPUT"
+            echo "No upstream changes."
+            exit 0
+          fi
+          if git merge --no-edit upstream/main; then
+            echo "synced=true" >> "$GITHUB_OUTPUT"
+          else
+            git merge --abort || true
+            echo "synced=conflict" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Conflicted files"
+              echo '```'
+              git diff --name-only main...upstream/main | head -50
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Push merge result
+        if: steps.merge.outputs.synced == 'true'
+        run: git push origin main
+
+  build:
+    name: Build APK after sync
+    needs: sync
+    if: needs.sync.outputs.synced == 'true'
+    uses: ./.github/workflows/build-apk.yml
+
+  notify-conflict:
+    name: Open issue on merge conflict
+    needs: sync
+    if: failure() && needs.sync.outputs.synced == 'conflict'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create conflict issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "上游同步冲突：需要手动合并" \
+            --body "自动合并 upstream/main 失败（上游改动与汉化文件重叠）。请在本地执行：
+
+\`\`\`bash
+git remote add upstream $UPSTREAM_REPO
+git fetch upstream main
+git merge upstream/main
+# 解决冲突后：git add -A && git commit && git push
+\`\`\`
+
+冲突解决注意：上游新增的英文文案需要按既有风格翻译为简体中文（术语表见 commit 880f676 的说明）。" \
+            || echo "issue already exists or failed"
