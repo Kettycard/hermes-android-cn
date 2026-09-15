@@ -931,10 +931,19 @@ class WsClient {
     );
   }
 
-  /// Create a new chat session.
-  Future<String> createSession({String? model}) async {
+  /// Create a new chat session using the stock Hermes `session.create`
+  /// contract.
+  ///
+  /// The gateway owns the new runtime session id. [workingDirectory] is sent
+  /// as `cwd` so Hermes can associate the session with the matching Project.
+  Future<String> createSession({
+    String? model,
+    String? workingDirectory,
+  }) async {
     final params = <String, dynamic>{};
     if (model != null) params['model'] = model;
+    final cwd = workingDirectory?.trim();
+    if (cwd != null && cwd.isNotEmpty) params['cwd'] = cwd;
     final result = await send('session.create', params);
     if (result['error'] != null) {
       throw _gatewayResponseError(
@@ -944,21 +953,6 @@ class WsClient {
       );
     }
     return result['result']?['session_id'] as String? ?? '';
-  }
-
-  /// Resume an existing session via session.create (which starts a new
-  /// agent process for the given session ID). This works for sessions
-  /// that exist in the REST API but aren't active in the gateway.
-  Future<String> createOrResumeSession(String sessionId) async {
-    final result = await send('session.create', {'session_id': sessionId});
-    if (result['error'] != null) {
-      throw _gatewayResponseError(
-        'session.create',
-        result['error'],
-        fallbackMessage: 'Unknown error',
-      );
-    }
-    return result['result']?['session_id'] as String? ?? sessionId;
   }
 
   /// Applies a model only to one live gateway session.  Hermes interprets the

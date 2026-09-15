@@ -2016,6 +2016,52 @@ void main() {
       }
     });
 
+    test(
+      'creates a Project session with cwd and no client session id',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        final requestSeen = Completer<Map<String, dynamic>>();
+        final socketSubscription = server
+            .transform(WebSocketTransformer())
+            .listen((socket) {
+              socket.listen((raw) {
+                final request =
+                    jsonDecode(raw as String) as Map<String, dynamic>;
+                requestSeen.complete(request);
+                socket.add(
+                  jsonEncode({
+                    'jsonrpc': '2.0',
+                    'id': request['id'],
+                    'result': {
+                      'session_id': 'runtime-created',
+                      'stored_session_id': 'stored-created',
+                    },
+                  }),
+                );
+              });
+            });
+        final client = WsClient('http://127.0.0.1:${server.port}');
+
+        try {
+          await client.connect();
+          expect(
+            await client.createSession(
+              workingDirectory: ' /srv/projects/hermes-android ',
+            ),
+            'runtime-created',
+          );
+          final request = await requestSeen.future;
+          expect(request['method'], 'session.create');
+          expect(request['params'], {'cwd': '/srv/projects/hermes-android'});
+          expect(request['params'], isNot(contains('session_id')));
+        } finally {
+          client.close();
+          await socketSubscription.cancel();
+          await server.close(force: true);
+        }
+      },
+    );
+
     test('sends official session.title and session.branch frames', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       final requests = <Map<String, dynamic>>[];
