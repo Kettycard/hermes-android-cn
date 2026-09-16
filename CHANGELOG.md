@@ -4,7 +4,7 @@ All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Release notes for
 versions prior to 1.0.7 are in the **What's new** sections of the [README](README.md).
 
-## [Unreleased]
+## [2.1.3] - 2026-09-17
 
 ### Fixed
 
@@ -17,6 +17,15 @@ versions prior to 1.0.7 are in the **What's new** sections of the [README](READM
   *Custom proxy and dashboard details*) that is added to every JSON-RPC
   payload on that socket, the way Hermes Desktop does. Leave it blank for
   isolated per-profile dashboards.
+- Chat models can be listed and applied without a Desktop Gateway configured (PR #97).
+- The desktop gateway URL field no longer hard-codes a default, and optional connection fields can now be cleared (PR #86).
+- The release pipeline pins the production APK signing certificate so a wrong keystore aborts the release instead of publishing a broken APK (PR #99).
+
+### Thanks
+
+- @AletheiaVox for the Hermes-profile plumbing on the Desktop Gateway socket (PR #98).
+- @software-greg for the gateway-less chat model picker (PR #97).
+- @realchrisolin for the desktop gateway URL field fixes (PR #86).
 
 ## [2.1.2] - 2026-09-17
 
