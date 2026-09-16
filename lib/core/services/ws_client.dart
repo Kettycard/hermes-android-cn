@@ -144,6 +144,20 @@ class RemoteFileAttachment {
   });
 }
 
+/// Both identities minted by the stock Hermes `session.create` contract.
+///
+/// The runtime id addresses calls on the current socket. The stored id is the
+/// durable identity required by `session.resume` after that socket disconnects.
+class CreatedGatewaySession {
+  final String runtimeSessionId;
+  final String storedSessionId;
+
+  const CreatedGatewaySession({
+    required this.runtimeSessionId,
+    required this.storedSessionId,
+  });
+}
+
 typedef StreamCallback = void Function(StreamEvent event);
 typedef ConnectionCallback = void Function(bool connected);
 typedef GatewayReadyCallback = void Function(Map<String, dynamic> frame);
@@ -936,7 +950,7 @@ class WsClient {
   ///
   /// The gateway owns the new runtime session id. [workingDirectory] is sent
   /// as `cwd` so Hermes can associate the session with the matching Project.
-  Future<String> createSession({
+  Future<CreatedGatewaySession> createSession({
     String? model,
     String? workingDirectory,
   }) async {
@@ -952,7 +966,23 @@ class WsClient {
         fallbackMessage: 'Unknown error',
       );
     }
-    return result['result']?['session_id'] as String? ?? '';
+    final payload = result['result'];
+    if (payload is! Map) {
+      throw JsonRpcError('session.create', 'Gateway returned no session');
+    }
+    final runtimeSessionId = payload['session_id']?.toString().trim() ?? '';
+    final storedSessionId =
+        payload['stored_session_id']?.toString().trim() ?? '';
+    if (runtimeSessionId.isEmpty || storedSessionId.isEmpty) {
+      throw JsonRpcError(
+        'session.create',
+        'Gateway returned incomplete session identities',
+      );
+    }
+    return CreatedGatewaySession(
+      runtimeSessionId: runtimeSessionId,
+      storedSessionId: storedSessionId,
+    );
   }
 
   /// Applies a model only to one live gateway session.  Hermes interprets the

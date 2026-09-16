@@ -34,6 +34,8 @@ class DesktopGatewayClient {
   final String _documentProfile;
   WsClient? _ws;
   final Map<String, String> _gatewaySessionIds = {};
+  final Map<String, String> _storedSessionIds = {};
+  final Map<String, String> _workingDirectories = {};
   DesktopAsyncEventCallback? _asyncEventListener;
   DesktopConnectionCallback? _connectionListener;
   GatewayTurnCoordinatorRegistry? _turnCoordinatorRegistry;
@@ -141,6 +143,7 @@ class DesktopGatewayClient {
         port: baseUri.port,
         useHttps: baseUri.scheme == 'https',
         pathPrefix: pathPrefix,
+        proxied: connection.dashboardProxied,
         username: connection.dashboardUsername,
         password: connection.dashboardPassword,
       ),
@@ -152,19 +155,25 @@ class DesktopGatewayClient {
     String mobileSessionId, {
     String? workingDirectory,
   }) async {
+    final requestedWorkingDirectory = workingDirectory?.trim();
+    if (requestedWorkingDirectory != null &&
+        requestedWorkingDirectory.isNotEmpty) {
+      _workingDirectories[mobileSessionId] = requestedWorkingDirectory;
+    }
+    final effectiveWorkingDirectory = _workingDirectories[mobileSessionId];
     final existing = _ws;
     if (existing != null && existing.isConnected) {
       final mappedSessionId = _gatewaySessionIds[mobileSessionId];
       if (mappedSessionId != null) {
         return _DesktopGatewaySession(existing, mappedSessionId);
       }
-      final gatewaySessionId = await _resumeOrCreate(
+      final binding = await _resumeOrCreate(
         existing,
         mobileSessionId,
-        workingDirectory: workingDirectory,
+        workingDirectory: effectiveWorkingDirectory,
       );
-      _gatewaySessionIds[mobileSessionId] = gatewaySessionId;
-      return _DesktopGatewaySession(existing, gatewaySessionId);
+      _rememberBinding(mobileSessionId, binding);
+      return _DesktopGatewaySession(existing, binding.runtimeSessionId);
     }
 
     _connectionListener?.call(
@@ -188,13 +197,13 @@ class DesktopGatewayClient {
     try {
       await client.connect();
       _ws = client;
-      final gatewaySessionId = await _resumeOrCreate(
+      final binding = await _resumeOrCreate(
         client,
         mobileSessionId,
-        workingDirectory: workingDirectory,
+        workingDirectory: effectiveWorkingDirectory,
       );
-      _gatewaySessionIds[mobileSessionId] = gatewaySessionId;
-      return _DesktopGatewaySession(client, gatewaySessionId);
+      _rememberBinding(mobileSessionId, binding);
+      return _DesktopGatewaySession(client, binding.runtimeSessionId);
     } catch (_) {
       client.close();
       if (identical(_ws, client)) _ws = null;
@@ -203,23 +212,43 @@ class DesktopGatewayClient {
     }
   }
 
-  Future<String> _resumeOrCreate(
+  Future<_DesktopGatewayBinding> _resumeOrCreate(
     WsClient client,
     String mobileSessionId, {
     String? workingDirectory,
   }) async {
+    final storedSessionId =
+        _storedSessionIds[mobileSessionId] ?? mobileSessionId;
     try {
-      return await client.resumeSession(mobileSessionId);
+      final runtimeSessionId = await client.resumeSession(storedSessionId);
+      return _DesktopGatewayBinding(
+        runtimeSessionId: runtimeSessionId,
+        storedSessionId: storedSessionId,
+      );
     } on JsonRpcError catch (error) {
       if (error.code != 4007 &&
           !error.message.toLowerCase().contains('session not found')) {
         rethrow;
       }
       // New mobile chats do not exist in Hermes yet. Stock Hermes rejects a
-      // client-supplied `session_id` on session.create, so let the gateway mint
-      // the runtime id and reconcile it through _gatewaySessionIds in _connect.
-      return client.createSession(workingDirectory: workingDirectory);
+      // client-supplied `session_id` on session.create, so retain both gateway-
+      // minted identities: runtime for this socket and stored for reconnect.
+      final created = await client.createSession(
+        workingDirectory: workingDirectory,
+      );
+      return _DesktopGatewayBinding(
+        runtimeSessionId: created.runtimeSessionId,
+        storedSessionId: created.storedSessionId,
+      );
     }
+  }
+
+  void _rememberBinding(
+    String mobileSessionId,
+    _DesktopGatewayBinding binding,
+  ) {
+    _gatewaySessionIds[mobileSessionId] = binding.runtimeSessionId;
+    _storedSessionIds[mobileSessionId] = binding.storedSessionId;
   }
 
   Future<void> ensureSession(
@@ -484,6 +513,8 @@ class DesktopGatewayClient {
     _ws?.close();
     _ws = null;
     _gatewaySessionIds.clear();
+    _storedSessionIds.clear();
+    _workingDirectories.clear();
     final turnCoordinatorRegistry = _turnCoordinatorRegistry;
     _turnCoordinatorRegistry = null;
     if (turnCoordinatorRegistry != null) {
@@ -515,4 +546,14 @@ class _DesktopGatewaySession {
   final String sessionId;
 
   const _DesktopGatewaySession(this.client, this.sessionId);
+}
+
+class _DesktopGatewayBinding {
+  final String runtimeSessionId;
+  final String storedSessionId;
+
+  const _DesktopGatewayBinding({
+    required this.runtimeSessionId,
+    required this.storedSessionId,
+  });
 }
