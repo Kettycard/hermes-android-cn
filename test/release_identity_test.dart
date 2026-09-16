@@ -55,6 +55,17 @@ void main() {
     expect(releaseWorkflow, contains('GITHUB_REF_TYPE'));
     expect(releaseWorkflow, contains('Refuse an unsigned tagged release'));
     expect(releaseWorkflow, contains("env.HAS_RELEASE_KEYSTORE == 'true'"));
+    expect(
+      releaseWorkflow,
+      contains(
+        "EXPECTED_RELEASE_CERT_SHA256: '475baf431b16d050c8f658ac838783b273f7c10bba06ed1d16bb0a4239f592fb'",
+      ),
+    );
+    expect(
+      releaseWorkflow,
+      contains(r'certificate SHA-256 digest:\s*([0-9a-fA-F]+)'),
+    );
+    expect(releaseWorkflow, contains('if certs != {expected_cert}:'));
     expect(qualityWorkflow, contains("MINIMUM_INSTALLED_VERSION_CODE: '2127'"));
     expect(qualityWorkflow, contains("REQUIRED_BASE_VERSION_CODE: '2142'"));
   });
