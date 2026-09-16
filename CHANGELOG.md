@@ -4,6 +4,76 @@ All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Release notes for
 versions prior to 1.0.7 are in the **What's new** sections of the [README](README.md).
 
+## [2.1.2] - 2026-09-17
+
+### Fixed
+
+- Project chats open on stock Hermes gateways. The commit-before-open path no
+  longer depends on `projects.assign_session` (never shipped upstream): a
+  missing sibling falls back to binding the chat through the session `cwd`
+  that the stock gateway already honours for project grouping, and the
+  `session.create` request now matches stock `SessionCreateParams` (no
+  client-supplied `session_id`).
+- Reconnects after a dropped socket now resume the gateway-minted stored
+  session identity instead of creating a second session, and remember the
+  Project working directory so a recreated session stays in its project.
+
+### Thanks
+
+- @Thaeland for the stock-gateway diagnosis in #100 and the cwd-fallback fix
+  in PR #102.
+
+## [2.1.1] - 2026-09-06
+
+### Fixed
+
+- Parse the batch `questions[]` clarify payload emitted by stock Hermes
+  gateways, not just the custom desktop gateway shape (PR #95).
+
+### Changed
+
+- Release builds now fail when an APK lacks a valid signing block, so unsigned
+  artefacts can no longer be tagged and published (PR #96).
+
+## [2.1.0] - 2026-09-03
+
+Community daily-driver workspace edition from
+[@CarlosReyesPena](https://github.com/CarlosReyesPena) (PR #88).
+
+### Added
+
+- Workspace shell: Home attention digest, global New chat button, Activity
+  operational timeline, More pane routing Cron/Skills/Memory/Settings/dashboard.
+- Projects pane over the gateway `projects.*` RPC family: tree overview,
+  per-project chats, Spaces→Projects migration preview and write path, chat
+  moves between projects, per-project search, safe deletion, and legacy-gateway
+  compatibility mode.
+- Chats browser with All/Recent/Unassigned/Archived filters, date grouping,
+  status and project labels.
+- Session search with three per-connection modes: on-device, dashboard FTS5
+  full-text with matching excerpts, and AI-assisted query rewriting.
+- Encrypted configuration export/import (PBKDF2 + AES-256-GCM), with restore
+  available from the empty-connection state.
+- Quick chat lifecycle: app shortcut, share-target intents, share review
+  sheets, 72-hour archive policy.
+- Gateway capability discovery (CapabilityRegistry) so older gateways degrade
+  gracefully instead of erroring.
+- Runtime Android 13+ notification permission request.
+- Chat UI: sticky context header, You/Hermes role labels, long-press action
+  sheet, fenced code blocks with copy and wrap/scroll toggle, full tool output
+  on expanded activity cards.
+
+### Fixed
+
+- Fresh TCP per request with a 20 s timeout fixes stale keep-alive hangs.
+- FAB no longer swallows taps on the More destination.
+
+### Validation
+
+- `flutter analyze` clean; 941 Flutter tests pass (including release-identity
+  gates), CI green on PR #88.
+- Secret scan of the merged diff: no real credentials (test fixtures only).
+
 ## [1.0.14-hermesapk.14] - 2026-07-30
 
 ### Added

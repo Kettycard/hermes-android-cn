@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hermes_android/core/services/connection_manager.dart';
+import 'package:hermes_android/core/services/desktop_gateway_client.dart';
 import 'package:hermes_android/core/services/ws_client.dart';
 
 /// Case-insensitive request header lookup — package:http normalises header
@@ -441,6 +442,57 @@ void main() {
       client.close();
     });
 
+    test(
+      'checkHealth reports the failing prefixed endpoint and status',
+      () async {
+        final client = ApiClient(
+          baseUrl: 'https://hermes.example',
+          pathPrefix: '/hermes',
+          apiKey: 'prefixed-test-key',
+          httpClient: MockClient((request) async {
+            expect(request.url.path, '/hermes/health');
+            return http.Response('not found', 404);
+          }),
+        );
+
+        final result = await client.checkHealth();
+
+        expect(result.isHealthy, isFalse);
+        expect(result.statusCode, 404);
+        expect(result.endpoint.path, '/hermes/health');
+        expect(
+          result.userMessage(apiKeyProvided: true),
+          allOf(contains('HTTP 404'), contains('reverse-proxy routes')),
+        );
+        client.close();
+      },
+    );
+
+    test(
+      'checkHealth attributes auth failures to the sessions endpoint',
+      () async {
+        final client = ApiClient(
+          baseUrl: 'http://hermes.local:8642',
+          apiKey: 'invalid-test-key',
+          httpClient: MockClient((request) async {
+            if (request.url.path == '/health') return http.Response('{}', 200);
+            return http.Response('unauthorized', 401);
+          }),
+        );
+
+        final result = await client.checkHealth();
+
+        expect(result.isHealthy, isFalse);
+        expect(result.statusCode, 401);
+        expect(result.endpoint.path, '/api/sessions');
+        expect(
+          result.userMessage(apiKeyProvided: true),
+          contains('API key was rejected'),
+        );
+        client.close();
+      },
+    );
+
     test('deleteSession deletes a remote Hermes session', () async {
       final client = ApiClient(
         baseUrl: 'http://hermes.local:8642',
@@ -618,6 +670,81 @@ void main() {
         api.close();
       },
     );
+  });
+
+  group('Desktop gateway URL derivation', () {
+    test('derives the Desktop gateway from dashboard details by default', () {
+      final connection = SavedConnection(
+        id: 'miniserver',
+        label: 'Miniserver',
+        host: 'carlos-miniserver.taild544f6.ts.net',
+        port: 8642,
+        apiKey: 'test-key',
+        dashboardPortOverride: 9119,
+        dashboardUsername: 'carlos',
+        dashboardPassword: 'secret',
+      );
+
+      expect(
+        DesktopGatewayClient.normalizedGatewayBaseUrl(connection),
+        'http://carlos-miniserver.taild544f6.ts.net:9119',
+      );
+    });
+
+    test(
+      'ignores a redundant same-host override and derives dashboard port',
+      () {
+        final connection = SavedConnection(
+          id: 'miniserver',
+          label: 'Miniserver',
+          host: 'carlos-miniserver.taild544f6.ts.net',
+          port: 8642,
+          apiKey: 'test-key',
+          dashboardPortOverride: 9119,
+          desktopGatewayUrl: 'https://carlos-miniserver.taild544f6.ts.net',
+        );
+
+        expect(
+          DesktopGatewayClient.normalizedGatewayBaseUrl(connection),
+          'http://carlos-miniserver.taild544f6.ts.net:9119',
+        );
+      },
+    );
+
+    test('preserves an explicit Desktop gateway override', () {
+      final connection = SavedConnection(
+        id: 'remote',
+        label: 'Remote',
+        host: 'api.example.test',
+        port: 8642,
+        apiKey: 'test-key',
+        useHttps: true,
+        dashboardPortOverride: 9119,
+        desktopGatewayUrl: 'https://desktop.example.test/gateway',
+      );
+
+      expect(
+        DesktopGatewayClient.normalizedGatewayBaseUrl(connection),
+        'https://desktop.example.test:443/gateway',
+      );
+    });
+
+    test('includes the dashboard path prefix in the derived URL', () {
+      final connection = SavedConnection(
+        id: 'proxied',
+        label: 'Proxied',
+        host: 'hermes.example.test',
+        port: 443,
+        apiKey: 'test-key',
+        useHttps: true,
+        dashboardPrefix: 'dashboard',
+      );
+
+      expect(
+        DesktopGatewayClient.normalizedGatewayBaseUrl(connection),
+        'https://hermes.example.test:443/dashboard',
+      );
+    });
   });
 
   group('DashboardClient', () {
@@ -1889,6 +2016,51 @@ void main() {
       }
     });
 
+    test(
+      'creates a Project session with cwd and no client session id',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        final requestSeen = Completer<Map<String, dynamic>>();
+        final socketSubscription = server
+            .transform(WebSocketTransformer())
+            .listen((socket) {
+              socket.listen((raw) {
+                final request =
+                    jsonDecode(raw as String) as Map<String, dynamic>;
+                requestSeen.complete(request);
+                socket.add(
+                  jsonEncode({
+                    'jsonrpc': '2.0',
+                    'id': request['id'],
+                    'result': {
+                      'session_id': 'runtime-created',
+                      'stored_session_id': 'stored-created',
+                    },
+                  }),
+                );
+              });
+            });
+        final client = WsClient('http://127.0.0.1:${server.port}');
+
+        try {
+          await client.connect();
+          final created = await client.createSession(
+            workingDirectory: ' /srv/projects/hermes-android ',
+          );
+          expect(created.runtimeSessionId, 'runtime-created');
+          expect(created.storedSessionId, 'stored-created');
+          final request = await requestSeen.future;
+          expect(request['method'], 'session.create');
+          expect(request['params'], {'cwd': '/srv/projects/hermes-android'});
+          expect(request['params'], isNot(contains('session_id')));
+        } finally {
+          client.close();
+          await socketSubscription.cancel();
+          await server.close(force: true);
+        }
+      },
+    );
+
     test('sends official session.title and session.branch frames', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       final requests = <Map<String, dynamic>>[];
@@ -1931,6 +2103,163 @@ void main() {
         await socketSubscription.cancel();
         await server.close(force: true);
       }
+    });
+
+    group('DesktopGatewayClient session binding', () {
+      // The fixture mimics a secured Desktop gateway: the HTTP endpoint mints
+      // a WebSocket ticket, and each upgraded socket speaks the JSON-RPC
+      // session contract. session.resume is accepted only when the fixture
+      // has been told the stored identity exists; otherwise it rejects with
+      // 4007 so the client falls back to session.create with cwd. One fresh
+      // fixture per test keeps late async socket callbacks from leaking into
+      // the next test.
+      //
+      // TestWidgetsFlutterBinding (initialised by other tests in this file)
+      // replaces HttpClient with a mock that answers every request with 400.
+      // These tests talk to a real loopback server, so clear the global
+      // override for the duration of the group and restore it afterwards.
+      late _ProjectGatewayFixture fixture;
+      HttpOverrides? savedHttpOverrides;
+
+      Future<void> expectSoon(
+        bool Function() condition, {
+        String reason = 'condition',
+      }) async {
+        final deadline = DateTime.now().add(const Duration(seconds: 5));
+        while (!condition()) {
+          if (DateTime.now().isAfter(deadline)) {
+            fail('Timed out waiting for $reason');
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+      }
+
+      DesktopGatewayClient buildClient() {
+        final connection = SavedConnection(
+          id: 'conn-project',
+          label: 'Project gateway',
+          host: '127.0.0.1',
+          port: 8642,
+          apiKey: 'project-key',
+          dashboardPortOverride: fixture.server.port,
+          dashboardProxied: true,
+          desktopGatewayUrl: 'http://127.0.0.1:${fixture.server.port}',
+        );
+        return DesktopGatewayClient.fromConnection(connection);
+      }
+
+      setUp(() async {
+        savedHttpOverrides = HttpOverrides.current;
+        HttpOverrides.global = null;
+        fixture = _ProjectGatewayFixture();
+        await fixture.start();
+      });
+
+      tearDown(() async {
+        await fixture.stop();
+        HttpOverrides.global = savedHttpOverrides;
+      });
+
+      test('a send that reconnects after the socket drops still binds the '
+          'session to the Project working directory', () async {
+        final client = buildClient();
+        addTearDown(client.close);
+
+        await client.ensureSession(
+          'mobile-project',
+          workingDirectory: '/srv/projects/hermes-android',
+        );
+        await expectSoon(
+          () => fixture.openSockets.length == 1,
+          reason: 'first WebSocket connection',
+        );
+
+        // Simulate a gateway restart that lost the stored identity: the
+        // reconnect resume fails, so the next send must create the session
+        // again in the remembered Project working directory.
+        final states = <DesktopConnectionState>[];
+        client.setConnectionListener(states.add);
+        await fixture.openSockets.single.close();
+        await expectSoon(
+          () => states.contains(DesktopConnectionState.disconnected),
+          reason: 'client observing the dropped socket',
+        );
+        await client
+            .submitPrompt(
+              sessionId: 'mobile-project',
+              text: 'hello',
+              onEvent: (_) {},
+            )
+            .then<void>((_) {}, onError: (_) {});
+
+        final createCalls = fixture.requests
+            .where((request) => request['method'] == 'session.create')
+            .toList();
+        await expectSoon(
+          () => createCalls.length == 2,
+          reason: 'reconnect session.create with the remembered cwd',
+        );
+        expect(createCalls[1]['params'], {
+          'cwd': '/srv/projects/hermes-android',
+        });
+        expect(createCalls[1]['params'], isNot(contains('session_id')));
+      });
+
+      test(
+        'a reconnect after disconnect resumes the stored identity instead of '
+        'creating a second session',
+        () async {
+          final client = buildClient();
+          addTearDown(client.close);
+
+          await client.ensureSession(
+            'mobile-project',
+            workingDirectory: '/srv/projects/hermes-android',
+          );
+          await expectSoon(
+            () => fixture.openSockets.length == 1,
+            reason: 'first WebSocket connection',
+          );
+          // The first socket rejected session.resume (unknown identity) and
+          // the client then created a session, minting the stored identity.
+          await expectSoon(
+            () => fixture.knownStoredIds.contains('stored-project'),
+            reason: 'session.create minting the stored identity',
+          );
+          // The fixture now knows the stored identity, so the reconnect must
+          // resume instead of creating a second session.
+          fixture.resumeKnownIds.add('stored-project');
+
+          // Drop the live socket; the client must reconnect and resume with
+          // the stored identity instead of creating a second session.
+          final states = <DesktopConnectionState>[];
+          client.setConnectionListener(states.add);
+          await fixture.openSockets.single.close();
+          await expectSoon(
+            () => states.contains(DesktopConnectionState.disconnected),
+            reason: 'client observing the dropped socket',
+          );
+          await client.ensureSession('mobile-project');
+          await expectSoon(
+            () => fixture.openSockets.length == 1,
+            reason: 'reconnect WebSocket connection replacing the dropped one',
+          );
+
+          final createCalls = fixture.requests
+              .where((request) => request['method'] == 'session.create')
+              .toList();
+          final resumeCalls = fixture.requests
+              .where((request) => request['method'] == 'session.resume')
+              .toList();
+          expect(createCalls, hasLength(1));
+          expect(createCalls.single['params'], {
+            'cwd': '/srv/projects/hermes-android',
+          });
+          expect(resumeCalls, hasLength(2));
+          expect(resumeCalls.first['params'], {'session_id': 'mobile-project'});
+          expect(resumeCalls.last['params'], {'session_id': 'stored-project'});
+        },
+      );
     });
 
     test('reads and writes session-scoped reasoning effort', () async {
@@ -2158,6 +2487,48 @@ void main() {
       }
     });
 
+    test('echoes question_id back for batch clarify answers', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final requestSeen = Completer<Map<String, dynamic>>();
+      final socketSubscription = server
+          .transform(WebSocketTransformer())
+          .listen((socket) {
+            socket.listen((raw) {
+              final request = jsonDecode(raw as String) as Map<String, dynamic>;
+              if (!requestSeen.isCompleted) requestSeen.complete(request);
+              socket.add(
+                jsonEncode({
+                  'jsonrpc': '2.0',
+                  'id': request['id'],
+                  'result': {'status': 'ok', 'remaining': <String>[]},
+                }),
+              );
+            });
+          });
+      final client = WsClient('http://127.0.0.1:${server.port}');
+
+      try {
+        await client.connect();
+        await client.respondToClarify(
+          requestId: 'clarify-request-123',
+          questionId: 'q1',
+          answer: 'Balanced',
+        );
+        final request = await requestSeen.future;
+
+        expect(request['method'], 'clarify.respond');
+        expect(request['params'], {
+          'request_id': 'clarify-request-123',
+          'question_id': 'q1',
+          'answer': 'Balanced',
+        });
+      } finally {
+        client.close();
+        await socketSubscription.cancel();
+        await server.close(force: true);
+      }
+    });
+
     test('rejects an invalid approval choice before sending it', () async {
       final client = WsClient('http://127.0.0.1:1');
 
@@ -2369,4 +2740,122 @@ void main() {
       );
     });
   });
+}
+
+/// Minimal secured Desktop gateway fixture: mints WebSocket tickets over HTTP
+/// and speaks the JSON-RPC session contract on each upgraded socket.
+class _ProjectGatewayFixture {
+  late final HttpServer server;
+  final requests = <Map<String, dynamic>>[];
+  final openSockets = <WebSocket>[];
+  final perSocketRequests = <List<Map<String, dynamic>>>[];
+  final knownStoredIds = <String>{};
+  final resumeKnownIds = <String>{};
+  var ticketCount = 0;
+
+  void safeAdd(WebSocket socket, Map<String, dynamic> frame) {
+    // Tests close sockets while the fixture may still be answering an earlier
+    // frame; a write to a closed sink is a fixture artefact, not client
+    // behaviour.
+    try {
+      socket.add(jsonEncode(frame));
+    } on StateError {
+      // Socket already closed.
+    }
+  }
+
+  void handleSocket(WebSocket socket) {
+    final requestsForSocket = <Map<String, dynamic>>[];
+    openSockets.add(socket);
+    perSocketRequests.add(requestsForSocket);
+    socket.listen(
+      (raw) {
+        final request = jsonDecode(raw as String) as Map<String, dynamic>;
+        requestsForSocket.add(request);
+        requests.add(request);
+        final params = request['params'] as Map<String, dynamic>?;
+        if (request['method'] == 'session.resume') {
+          if (resumeKnownIds.contains(params?['session_id'])) {
+            safeAdd(socket, {
+              'jsonrpc': '2.0',
+              'id': request['id'],
+              'result': {'session_id': 'runtime-resumed'},
+            });
+          } else {
+            safeAdd(socket, {
+              'jsonrpc': '2.0',
+              'id': request['id'],
+              'error': {'code': 4007, 'message': 'session not found'},
+            });
+          }
+          return;
+        }
+        if (request['method'] == 'session.create') {
+          knownStoredIds.add('stored-project');
+          safeAdd(socket, {
+            'jsonrpc': '2.0',
+            'id': request['id'],
+            'result': {
+              'session_id': 'runtime-project',
+              'stored_session_id': 'stored-project',
+            },
+          });
+          return;
+        }
+        if (request['method'] == 'prompt.submit') {
+          // Fail the turn fast: this fixture only asserts the session
+          // lifecycle wire contract, not streaming turn delivery.
+          safeAdd(socket, {
+            'jsonrpc': '2.0',
+            'id': request['id'],
+            'error': {'code': 4005, 'message': 'fixture turns off'},
+          });
+          return;
+        }
+        safeAdd(socket, {
+          'jsonrpc': '2.0',
+          'id': request['id'],
+          'result': {'ok': true},
+        });
+      },
+      onDone: () {
+        openSockets.remove(socket);
+        perSocketRequests.remove(requestsForSocket);
+      },
+    );
+  }
+
+  Future<void> start() async {
+    server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((request) async {
+      try {
+        if (request.uri.path == '/api/auth/ws-ticket') {
+          ticketCount += 1;
+          request.response
+            ..statusCode = 200
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode({'ticket': 'TICKET_$ticketCount'}));
+          await request.response.close();
+        } else if (WebSocketTransformer.isUpgradeRequest(request)) {
+          final socket = await WebSocketTransformer.upgrade(request);
+          handleSocket(socket);
+        } else {
+          request.response
+            ..statusCode = 404
+            ..write('not found');
+          await request.response.close();
+        }
+      } catch (_) {
+        // A fixture request that cannot be answered must not take down the
+        // whole test suite; the failing assertion will surface the cause.
+      }
+    });
+  }
+
+  Future<void> stop() async {
+    for (final socket in List<WebSocket>.from(openSockets)) {
+      await socket.close();
+    }
+    await server.close(force: true);
+  }
 }
