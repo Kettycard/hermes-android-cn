@@ -18,6 +18,25 @@ versions prior to 1.0.7 are in the **What's new** sections of the [README](READM
   payload on that socket, the way Hermes Desktop does. Leave it blank for
   isolated per-profile dashboards.
 
+## [2.1.2] - 2026-09-17
+
+### Fixed
+
+- Project chats open on stock Hermes gateways. The commit-before-open path no
+  longer depends on `projects.assign_session` (never shipped upstream): a
+  missing sibling falls back to binding the chat through the session `cwd`
+  that the stock gateway already honours for project grouping, and the
+  `session.create` request now matches stock `SessionCreateParams` (no
+  client-supplied `session_id`).
+- Reconnects after a dropped socket now resume the gateway-minted stored
+  session identity instead of creating a second session, and remember the
+  Project working directory so a recreated session stays in its project.
+
+### Thanks
+
+- @Thaeland for the stock-gateway diagnosis in #100 and the cwd-fallback fix
+  in PR #102.
+
 ## [2.1.1] - 2026-09-06
 
 ### Fixed
