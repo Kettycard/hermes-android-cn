@@ -1261,7 +1261,7 @@ void main() {
               jsonEncode({
                 'jsonrpc': '2.0',
                 'id': frame['id'],
-                'result': {'session_id': 'abc'},
+                'result': {'session_id': 'abc', 'stored_session_id': 'abc'},
               }),
             );
           });
@@ -1274,7 +1274,7 @@ void main() {
         try {
           await client.connect();
           await client.resumeSession('abc');
-          await client.createOrResumeSession('abc');
+          await client.createSession();
           await client.send('config.get', {'key': 'model'});
 
           expect(requestUris, hasLength(1));
