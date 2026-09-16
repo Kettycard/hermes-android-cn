@@ -167,6 +167,7 @@ class WsClient {
   final String baseUrl;
   final String? _token;
   final String? _ticket;
+  final String? _profile;
   IOWebSocketChannel? _channel;
   bool _connected = false;
   int _nextId = 1;
@@ -194,11 +195,16 @@ class WsClient {
   ConnectionCallback? onConnectionChanged;
   GatewayReadyCallback? onGatewayReady;
 
-  factory WsClient(String baseUrl, {String? token, String? ticket}) {
-    return WsClient._(baseUrl, token, ticket);
+  factory WsClient(
+    String baseUrl, {
+    String? token,
+    String? ticket,
+    String? profile,
+  }) {
+    return WsClient._(baseUrl, token, ticket, profile);
   }
 
-  WsClient._(this.baseUrl, this._token, this._ticket);
+  WsClient._(this.baseUrl, this._token, this._ticket, this._profile);
 
   /// Connect to the WebSocket gateway.
   Future<void> connect() async {
@@ -343,6 +349,25 @@ class WsClient {
         ? {'token': token!.trim()}
         : const <String, String>{};
     return uri.replace(queryParameters: credential).toString();
+  }
+
+  /// Adds the connection's Hermes profile to a JSON-RPC params map.
+  ///
+  /// A machine-level `hermes dashboard` / `hermes serve` hosts every profile
+  /// on the machine and scopes each RPC by `params['profile']`
+  /// (`_profile_db` / `_profile_scoped` on the server; `session.create` and
+  /// `session.resume` store it on the session so later turns re-bind to that
+  /// profile's home). The socket URL carries no profile. Hermes Desktop sends
+  /// the field on every scoped request, so this does the same. A blank
+  /// profile sends nothing and the server keeps its own default; a caller that
+  /// already set `profile` wins.
+  static Map<String, dynamic> withProfile(
+    Map<String, dynamic> params,
+    String? profile,
+  ) {
+    final name = profile?.trim() ?? '';
+    if (name.isEmpty || params.containsKey('profile')) return params;
+    return <String, dynamic>{...params, 'profile': name};
   }
 
   /// Handle inbound messages.
@@ -570,7 +595,7 @@ class WsClient {
       jsonEncode({
         'jsonrpc': '2.0',
         'method': method,
-        'params': params,
+        'params': withProfile(params, _profile),
         'id': id,
       }),
     );
@@ -607,7 +632,7 @@ class WsClient {
       jsonEncode({
         'jsonrpc': '2.0',
         'method': method,
-        'params': params,
+        'params': withProfile(params, _profile),
         'id': id,
       }),
     );
@@ -772,10 +797,7 @@ class WsClient {
         'A Hermes request ID is required',
       );
     }
-    final params = <String, dynamic>{
-      'request_id': requestId,
-      'answer': answer,
-    };
+    final params = <String, dynamic>{'request_id': requestId, 'answer': answer};
     if (questionId != null && questionId.trim().isNotEmpty) {
       params['question_id'] = questionId;
     }

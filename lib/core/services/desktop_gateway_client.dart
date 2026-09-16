@@ -32,6 +32,10 @@ class DesktopGatewayClient {
   final String _baseUrl;
   final DashboardClient _dashboard;
   final String _documentProfile;
+
+  /// Hermes profile the gateway socket should run chats under, or null to
+  /// let the server use its own. See [SavedConnection.gatewayProfile].
+  final String? _gatewayProfile;
   WsClient? _ws;
   final Map<String, String> _gatewaySessionIds = {};
   final Map<String, String> _storedSessionIds = {};
@@ -60,6 +64,7 @@ class DesktopGatewayClient {
     required this._baseUrl,
     required this._dashboard,
     required this._documentProfile,
+    this._gatewayProfile,
   });
 
   /// The canonical gateway origin for [connection].
@@ -148,6 +153,7 @@ class DesktopGatewayClient {
         password: connection.dashboardPassword,
       ),
       documentProfile: documentIntakeProfileForConnection(connection),
+      gatewayProfile: connection.gatewayProfile,
     );
   }
 
@@ -184,7 +190,7 @@ class DesktopGatewayClient {
     existing?.close();
     _gatewaySessionIds.clear();
     final ticket = await _dashboard.mintWebSocketTicket();
-    final client = WsClient(_baseUrl, ticket: ticket);
+    final client = WsClient(_baseUrl, ticket: ticket, profile: _gatewayProfile);
     _installAsyncEventBridge(client);
     client.onConnectionChanged = (connected) {
       if (connected) {
@@ -291,7 +297,7 @@ class DesktopGatewayClient {
     existing?.close();
     _gatewaySessionIds.clear();
     final ticket = await _dashboard.mintWebSocketTicket();
-    final client = WsClient(_baseUrl, ticket: ticket);
+    final client = WsClient(_baseUrl, ticket: ticket, profile: _gatewayProfile);
     _installAsyncEventBridge(client);
     client.onConnectionChanged = (connected) {
       if (connected) {
@@ -324,7 +330,7 @@ class DesktopGatewayClient {
       journal: journal ?? GatewayTurnJournal(),
       freshSocketFactory: () async {
         final ticket = await _dashboard.mintWebSocketTicket();
-        return WsClient(_baseUrl, ticket: ticket);
+        return WsClient(_baseUrl, ticket: ticket, profile: _gatewayProfile);
       },
     );
   }

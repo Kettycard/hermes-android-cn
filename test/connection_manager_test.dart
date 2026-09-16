@@ -345,6 +345,32 @@ void main() {
       expect(restored.dashboardPort, 9119);
     });
 
+    test('round-trips the Hermes profile and clears it via copyWith', () {
+      final conn = SavedConnection(
+        id: '4',
+        label: 'Sol',
+        host: 'hermes.example.com',
+        port: 8642,
+        apiKey: 'key',
+        gatewayProfile: 'sol',
+      );
+      final restored = SavedConnection.fromMap(conn.toMap());
+      expect(conn.toMap()['gateway_profile'], 'sol');
+      expect(restored.gatewayProfile, 'sol');
+      expect(
+        SavedConnection.fromMap({
+          'id': '5',
+          'label': 'Blank',
+          'host': 'hermes.example.com',
+          'port': 8642,
+          'gateway_profile': '  ',
+        }).gatewayProfile,
+        isNull,
+      );
+      expect(conn.copyWith(label: 'Still Sol').gatewayProfile, 'sol');
+      expect(conn.copyWith(clearGatewayProfile: true).gatewayProfile, isNull);
+    });
+
     test('fromMap normalises blank credentials to null', () {
       final restored = SavedConnection.fromMap({
         'id': '3',
@@ -1201,6 +1227,82 @@ void main() {
         'ws://hermes.local:9119/api/ws?token=spa',
       );
     });
+
+    test('withProfile adds the profile to params, blank sends nothing', () {
+      expect(WsClient.withProfile({'session_id': 'abc'}, 'sol'), {
+        'session_id': 'abc',
+        'profile': 'sol',
+      });
+      expect(WsClient.withProfile({'session_id': 'abc'}, '   '), {
+        'session_id': 'abc',
+      });
+      expect(WsClient.withProfile({'session_id': 'abc'}, null), {
+        'session_id': 'abc',
+      });
+      expect(
+        WsClient.withProfile({'session_id': 'abc', 'profile': 'kael'}, 'sol'),
+        {'session_id': 'abc', 'profile': 'kael'},
+      );
+    });
+
+    test(
+      'sends the Hermes profile in every JSON-RPC payload, not the URL',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        final requestUris = <Uri>[];
+        final frames = <Map<String, dynamic>>[];
+        final socketSubscription = server.listen((request) async {
+          requestUris.add(request.uri);
+          final socket = await WebSocketTransformer.upgrade(request);
+          socket.listen((message) {
+            final frame = jsonDecode(message as String) as Map<String, dynamic>;
+            frames.add(frame);
+            socket.add(
+              jsonEncode({
+                'jsonrpc': '2.0',
+                'id': frame['id'],
+                'result': {'session_id': 'abc', 'stored_session_id': 'abc'},
+              }),
+            );
+          });
+        });
+        final client = WsClient(
+          'http://127.0.0.1:${server.port}',
+          token: 'spa',
+          profile: 'sol',
+        );
+        try {
+          await client.connect();
+          await client.resumeSession('abc');
+          await client.createSession();
+          await client.send('config.get', {'key': 'model'});
+
+          expect(requestUris, hasLength(1));
+          expect(requestUris.single.path, '/api/ws');
+          expect(requestUris.single.queryParameters, {'token': 'spa'});
+          expect(frames.map((f) => f['method']), [
+            'session.resume',
+            'session.create',
+            'config.get',
+          ]);
+          for (final frame in frames) {
+            expect(
+              (frame['params'] as Map<String, dynamic>)['profile'],
+              'sol',
+              reason: '${frame['method']} must carry the profile',
+            );
+          }
+          expect(frames.first['params'], {
+            'session_id': 'abc',
+            'profile': 'sol',
+          });
+        } finally {
+          client.close();
+          await socketSubscription.cancel();
+          await server.close(force: true);
+        }
+      },
+    );
 
     test(
       'pins an immutable gateway.ready received before its waiter',

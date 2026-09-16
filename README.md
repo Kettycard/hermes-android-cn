@@ -283,6 +283,13 @@ afterwards:
      dashboard is exposed elsewhere.
    - **Username / Password** — only for a password-protected dashboard. Leave
      both blank for an open (`--insecure`) dashboard.
+   - **Hermes profile** — only when the dashboard is a *machine-level* one
+     (`hermes dashboard` / `hermes serve` without `--isolated`) that hosts
+     several profiles. Hermes scopes each JSON-RPC call on that socket by a
+     `profile` field in the request, and falls back to its own default
+     profile when it is missing, so without this field chats can quietly land
+     in the wrong profile. Use the profile name exactly as in `hermes profile
+     list`, e.g. `sol`. Leave blank for an isolated per-profile dashboard.
 3. Tap **Save**. The app validates the settings against the dashboard before
    storing them.
 
