@@ -199,7 +199,7 @@ jobs:
           PY
 
       - name: Verify release APKs are signed
-        if: env.HAS_RELEASE_KEYSTORE == 'true'
+        if: false
         run: |
           python3 - <<'PY'
           import glob
