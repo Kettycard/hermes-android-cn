@@ -121,6 +121,12 @@ class ChatScreen extends StatefulWidget {
   /// `null` stays explicit as Unassigned in the sticky context header.
   final String? projectName;
 
+  /// The owning Project's working directory on the gateway host. Forwarded as
+  /// `cwd` when this chat's session is created, so a Project chat runs inside
+  /// the project folder even on gateways without `projects.assign_session`
+  /// (stock Hermes derives project membership from the session cwd).
+  final String? projectWorkingDirectory;
+
   /// Optional text supplied by Android's share sheet. It only prefills the
   /// composer; sending remains an explicit user action.
   final String? initialComposerText;
@@ -163,6 +169,7 @@ class ChatScreen extends StatefulWidget {
     required this.connection,
     required this.session,
     this.projectName,
+    this.projectWorkingDirectory,
     this.initialComposerText,
     this.initialAttachmentDrafts = const [],
     this.turnApplicationController,
@@ -415,7 +422,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final gateway = _desktopGateway;
     if (gateway == null) return;
     try {
-      await gateway.ensureSession(widget.session.id);
+      await gateway.ensureSession(
+        widget.session.id,
+        workingDirectory: widget.projectWorkingDirectory,
+      );
     } catch (_) {
       // The composer remains available. The next send retries with a fresh
       // single-use ticket and surfaces an actionable error if it still fails.
@@ -1283,24 +1293,30 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Dashboard client used to list models when no Desktop Gateway is
+  /// configured. Listing needs only `api/model/info` + `api/model/options`
+  /// over REST — the gateway WebSocket is required solely to push a
+  /// per-session override, which [_setSessionModel] skips when no gateway is
+  /// present (the chosen model rides on the chat request instead).
+  DashboardClient _modelListingClient() => DashboardClient(
+    host: widget.connection.host,
+    port: widget.connection.dashboardPort,
+    pathPrefix: widget.connection.dashboardPrefix ?? '',
+    proxied: widget.connection.dashboardProxied,
+    useHttps: widget.connection.useHttps,
+    username: widget.connection.dashboardUsername,
+    password: widget.connection.dashboardPassword,
+  );
+
   Future<void> _showModelSelector() async {
     final desktopGateway = _desktopGateway;
-    if (desktopGateway == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            '请配置 Dashboard 凭据以选择对话模型。',
-          ),
-        ),
-      );
-      return;
-    }
+    final restClient = desktopGateway == null ? _modelListingClient() : null;
 
     setState(() => _loadingModelOptions = true);
     try {
       final results = await Future.wait([
-        desktopGateway.getModelInfo(),
-        desktopGateway.getModelOptions(),
+        desktopGateway?.getModelInfo() ?? restClient!.getModelInfo(),
+        desktopGateway?.getModelOptions() ?? restClient!.getModelOptions(),
       ]);
       if (!mounted) return;
       final modelInfo = results[0];
@@ -1315,9 +1331,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           _sessionReasoningEffort ??
           WsClient.normalizeReasoningEffort(modelInfo['reasoning_effort']);
       try {
-        currentEffort = await desktopGateway.getSessionReasoning(
-          widget.session.id,
-        );
+        if (desktopGateway != null) {
+          currentEffort = await desktopGateway.getSessionReasoning(
+            widget.session.id,
+          );
+        }
       } catch (_) {
         // Older gateways may not expose session-scoped config.get. The model
         // selector remains usable with the profile/default effort.
@@ -1476,19 +1494,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Future<void> _setSessionModel(_ModelSelection selection) async {
     final desktopGateway = _desktopGateway;
-    if (desktopGateway == null || _changingModel) return;
+    if (_changingModel) return;
     final choice = selection.choice;
     setState(() => _changingModel = true);
     try {
-      await desktopGateway.setSessionModel(
-        sessionId: widget.session.id,
-        provider: choice.provider,
-        model: choice.model,
-      );
-      await desktopGateway.setSessionReasoning(
-        sessionId: widget.session.id,
-        effort: selection.reasoningEffort,
-      );
+      // Without a gateway there is no session-scoped RPC to push the override
+      // to, so the selection stays local and is sent as the `model` field on
+      // each chat request instead. Reasoning effort is gateway-only and is
+      // simply not applied in that mode.
+      if (desktopGateway != null) {
+        await desktopGateway.setSessionModel(
+          sessionId: widget.session.id,
+          provider: choice.provider,
+          model: choice.model,
+        );
+        await desktopGateway.setSessionReasoning(
+          sessionId: widget.session.id,
+          effort: selection.reasoningEffort,
+        );
+      }
       final store = await _chatModelStore;
       await store.save(
         connectionIdentity: _chatModelConnectionIdentity,
@@ -1610,6 +1634,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     await _gateway.sendMessageStreaming(
       message: text,
       sessionId: widget.session.id,
+      // Carry the per-chat override on the request. The API server resolves
+      // `model` per call, so this reproduces session-scoped model selection
+      // without needing the gateway WebSocket to hold session state.
+      model: _sessionModelOverride ? _sessionModel : null,
       history: history,
       imageDataUrl: imageDataUrl,
       onToken: (token) {

@@ -57,21 +57,26 @@ SavedConnection _connection({
   );
 }
 
-Map<String, dynamic> _projectJson({required String id, required String name}) =>
-    {
-      'id': id,
-      'slug': name.toLowerCase(),
-      'name': name,
-      'archived': false,
-      'created_at': 1750000000,
-      'folders': const [],
-    };
+Map<String, dynamic> _projectJson({
+  required String id,
+  required String name,
+  String? primaryPath,
+}) => {
+  'id': id,
+  'slug': name.toLowerCase(),
+  'name': name,
+  'archived': false,
+  'created_at': 1750000000,
+  'primary_path': ?primaryPath,
+  'folders': const [],
+};
 
 Future<ProjectsRepository> _repository(
   List<Map<String, dynamic>> projects, {
   List<Map<String, dynamic>>? assignments,
   List<String>? deletions,
   int assignmentFailures = 0,
+  bool assignmentUnsupported = false,
   bool hangOverview = false,
   Map<String, ({String label, String sessionId})>? treeWithPreview,
 }) async {
@@ -132,6 +137,16 @@ Future<ProjectsRepository> _repository(
         };
       }
       if (method == 'projects.assign_session') {
+        if (assignmentUnsupported) {
+          return {
+            'jsonrpc': '2.0',
+            'id': 1,
+            'error': const {
+              'code': -32601,
+              'message': 'unknown method: projects.assign_session',
+            },
+          };
+        }
         if (failuresLeft > 0) {
           failuresLeft--;
           throw Exception('gateway offline');
@@ -1352,6 +1367,42 @@ void main() {
         {'session_id': opened.single.session.id, 'project_id': 'p2'},
       ]);
     });
+
+    testWidgets(
+      'a stock gateway without projects.assign_session opens in the project cwd',
+      (tester) async {
+        final opened = <NewChatDraft>[];
+        await _pump(
+          tester,
+          connection: _connection(desktopGatewayUrl: 'https://host:8642'),
+          repository: await _repository([
+            _projectJson(
+              id: 'p1',
+              name: 'Hermes Android',
+              primaryPath: '/srv/projects/hermes-android',
+            ),
+          ], assignmentUnsupported: true),
+          sessions: const [],
+          onNewChat: opened.add,
+          newChatSessionIdFactory: () => 'stock-project-chat',
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(kWorkspaceNewChatButtonKey));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(NewChatMode.projectChat.label));
+        await tester.pumpAndSettle();
+
+        expect(opened, hasLength(1));
+        expect(opened.single.session.id, 'stock-project-chat');
+        expect(opened.single.projectId, 'p1');
+        expect(
+          opened.single.projectWorkingDirectory,
+          '/srv/projects/hermes-android',
+        );
+        expect(find.textContaining('opened in the project’s folder'), findsOne);
+      },
+    );
 
     testWidgets(
       'a failed Project assignment offers a safe retry before opening',
