@@ -113,10 +113,10 @@ class _MemoryScreenState extends State<MemoryScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Memory'),
+            const Text('记忆'),
             if (_source != null)
               Text(
-                'Source: $_source',
+                '来源：$_source',
                 style: const TextStyle(fontSize: 11, color: Colors.grey),
               ),
           ],
@@ -147,7 +147,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
               const Icon(Icons.error_outline, size: 48, color: Colors.orange),
               const SizedBox(height: 16),
               Text(
-                'Failed to load memory',
+                '加载记忆失败',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),

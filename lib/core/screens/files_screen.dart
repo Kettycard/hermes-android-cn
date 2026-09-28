@@ -150,7 +150,7 @@ class _FilesScreenState extends State<FilesScreen> {
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${download.filename} downloaded')),
+        SnackBar(content: Text('${download.filename} 已下载')),
       );
     } catch (error) {
       if (!mounted) return;
@@ -254,7 +254,7 @@ class _FilesScreenState extends State<FilesScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _downloading ? null : _download,
                   icon: const Icon(Icons.download_outlined),
-                  label: const Text('Download'),
+                  label: const Text('下载'),
                 ),
               ),
               if (widget.onAddToChat != null) ...[

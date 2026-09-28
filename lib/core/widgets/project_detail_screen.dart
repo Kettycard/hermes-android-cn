@@ -35,7 +35,7 @@ import 'hermes_components.dart';
 typedef ProjectSessionsLoader =
     Future<ProjectSessionsView> Function({required bool refresh});
 typedef ProjectSessionMover =
-    Future<void> Function(Session session, String? projectId);
+    Future<String?> Function(Session session, String? projectId);
 typedef ProjectRenamer = Future<void> Function(String name);
 typedef ProjectArchiver = Future<void> Function();
 typedef ProjectDeleter = Future<void> Function();
@@ -188,8 +188,17 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
 
   Future<void> _moveSession(Session session, _MoveTarget target) async {
     try {
-      await widget.onMoveSession!(session, target.projectId);
+      final reason = await widget.onMoveSession!(session, target.projectId);
       if (!mounted) return;
+      if (reason != null) {
+        // The gateway could not perform this move (e.g. a stock gateway
+        // files chats by folder and cannot un-file one). Report the real
+        // reason instead of a generic failure with a doomed Retry.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法移动到 ${target.label}：$reason')),
+        );
+        return;
+      }
       await _load(refresh: true);
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -199,6 +208,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          persist: false,
           content: const Text('无法移动对话'),
           action: SnackBarAction(
             label: '重试',
@@ -303,6 +313,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   void _showManagementError(String action, Future<void> Function() retry) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        persist: false,
         content: Text('无法$action项目'),
         action: SnackBarAction(label: '重试', onPressed: retry),
       ),
@@ -356,6 +367,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
       setState(() => _deleting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          persist: false,
           content: const Text('无法删除项目'),
           action: SnackBarAction(
             label: '重试',

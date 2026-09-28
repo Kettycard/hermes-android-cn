@@ -46,12 +46,12 @@ class _SpacesScreenState extends State<SpacesScreen> {
             autofocus: true,
             maxLength: 80,
             textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(labelText: 'Name', errorText: error),
+            decoration: InputDecoration(labelText: '名称', errorText: error),
             onChanged: (value) => draft = value,
             onSubmitted: (value) {
               final normalized = value.trim();
               if (normalized.isEmpty) {
-                setDialogState(() => error = 'Enter a name');
+                setDialogState(() => error = '请输入名称');
               } else {
                 Navigator.pop(dialogContext, normalized);
               }
@@ -128,7 +128,7 @@ class _SpacesScreenState extends State<SpacesScreen> {
     }
   }
 
-  String _countLabel(int count) => count == 1 ? '1 chat' : '$count chats';
+  String _countLabel(int count) => count == 1 ? '1 个对话' : '$count 个对话';
 
   String? _activityLabel(double? timestamp) {
     if (timestamp == null) return null;
