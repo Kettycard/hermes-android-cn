@@ -2203,35 +2203,46 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Dashboard client used to list models when no Desktop Gateway is
-  /// configured. Listing needs only `api/model/info` + `api/model/options`
-  /// over REST — the gateway WebSocket is required solely to push a
-  /// per-session override, which [_setSessionModel] skips when no gateway is
-  /// present (the chosen model rides on the chat request instead).
-  DashboardClient _modelListingClient() => DashboardClient(
-    host: widget.connection.host,
-    port: widget.connection.dashboardPort,
-    pathPrefix: widget.connection.dashboardPrefix ?? '',
-    proxied: widget.connection.dashboardProxied,
-    useHttps: widget.connection.useHttps,
-    username: widget.connection.dashboardUsername,
-    password: widget.connection.dashboardPassword,
-  );
-
   Future<void> _showModelSelector() async {
     if (_pendingReattachResync) return;
+    await _sessionModelRestore;
+    if (!mounted || _pendingReattachResync) return;
     final desktopGateway = _desktopGateway;
-    final restClient = desktopGateway == null ? _modelListingClient() : null;
 
     setState(() => _loadingModelOptions = true);
     try {
-      final results = await Future.wait([
-        desktopGateway?.getModelInfo() ?? restClient!.getModelInfo(),
-        desktopGateway?.getModelOptions() ?? restClient!.getModelOptions(),
-      ]);
+      // API-server-only connections deliberately stay on port 8642. The API
+      // server exposes both the model inventory and the current session model;
+      // no Dashboard client or :9119 transport is needed for the picker.
+      late final Map<String, dynamic> sessionOrModelInfo;
+      late final Map<String, dynamic> modelOptions;
+      if (desktopGateway != null) {
+        final results = await Future.wait([
+          desktopGateway.getModelInfo(),
+          desktopGateway.getModelOptions(),
+        ]);
+        sessionOrModelInfo = results[0];
+        modelOptions = results[1];
+      } else if (widget.session.isLocalDraft) {
+        // A new chat deliberately has no server row until its first turn (or
+        // until a selected model is persisted below), so an exact-session GET
+        // would be a guaranteed 404. The API model inventory contains the
+        // profile default needed to initialise the picker.
+        sessionOrModelInfo = const {};
+        modelOptions = await _client.getModelOptions();
+      } else {
+        final results = await Future.wait([
+          _client.getSession(widget.session.id),
+          _client.getModelOptions(),
+        ]);
+        sessionOrModelInfo = results[0];
+        modelOptions = results[1];
+      }
       if (!mounted || _pendingReattachResync) return;
-      final modelInfo = results[0];
-      final choices = _parseModelChoices(results[1]);
+      final modelInfo = desktopGateway != null
+          ? sessionOrModelInfo
+          : modelOptions;
+      final choices = _parseModelChoices(modelOptions);
       if (choices.isEmpty) {
         throw StateError(
           'The active profile did not return any selectable models.',
@@ -2253,12 +2264,30 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       }
       if (!mounted || _pendingReattachResync) return;
 
-      var selectedChoice = choices.firstWhere(
-        (choice) =>
-            choice.model == (_sessionModel ?? widget.session.model) &&
-            (_sessionProvider == null || choice.provider == _sessionProvider),
-        orElse: () => choices.first,
+      final apiSessionModel =
+          desktopGateway == null && !widget.session.isLocalDraft
+          ? sessionOrModelInfo['model']?.toString().trim()
+          : null;
+      final selectedModel = apiSessionModel?.isNotEmpty == true
+          ? apiSessionModel!
+          : (_sessionModel ??
+                (widget.session.isLocalDraft
+                    ? modelOptions['model']?.toString().trim()
+                    : null) ??
+                widget.session.model);
+      final providerHint =
+          _sessionProvider ??
+          (widget.session.isLocalDraft
+              ? modelOptions['provider']?.toString().trim()
+              : desktopGateway != null
+              ? modelInfo['provider']?.toString().trim()
+              : null);
+      var selectedChoice = _initialModelChoice(
+        choices,
+        selectedModel: selectedModel,
+        provider: providerHint,
       );
+      final providerChoiceRequired = selectedChoice == null;
       var selectedEffort = currentEffort;
       final selection = await showModalBottomSheet<_ModelSelection>(
         context: context,
@@ -2278,6 +2307,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       '${modelInfo['provider'] == null ? '' : ' • ${modelInfo['provider']}'}',
                     ),
                   ),
+                  if (providerChoiceRequired)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: Text(
+                        'This model is available from multiple providers. Choose a provider to continue.',
+                      ),
+                    ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                     child: InputDecorator(
@@ -2314,8 +2350,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       itemBuilder: (context, index) {
                         final choice = choices[index];
                         final selected =
-                            choice.model == selectedChoice.model &&
-                            choice.provider == selectedChoice.provider;
+                            choice.model == selectedChoice?.model &&
+                            choice.provider == selectedChoice?.provider;
                         return ListTile(
                           leading: Icon(
                             selected
@@ -2345,13 +2381,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         ),
                         const SizedBox(width: 8),
                         FilledButton(
-                          onPressed: () => Navigator.pop(
-                            sheetContext,
-                            _ModelSelection(
-                              choice: selectedChoice,
-                              reasoningEffort: selectedEffort,
-                            ),
-                          ),
+                          onPressed: selectedChoice == null
+                              ? null
+                              : () => Navigator.pop(
+                                  sheetContext,
+                                  _ModelSelection(
+                                    choice: selectedChoice!,
+                                    reasoningEffort: selectedEffort,
+                                  ),
+                                ),
                           child: Text(context.l10n.apply_to_this_chat),
                         ),
                       ],
@@ -2407,16 +2445,37 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return choices;
   }
 
+  _ModelChoice? _initialModelChoice(
+    List<_ModelChoice> choices, {
+    required String selectedModel,
+    String? provider,
+  }) {
+    final candidates = choices
+        .where((choice) => choice.model == selectedModel)
+        .toList(growable: false);
+    final cleanProvider = provider?.trim() ?? '';
+    if (cleanProvider.isNotEmpty) {
+      for (final choice in candidates) {
+        if (choice.provider == cleanProvider) return choice;
+      }
+    }
+    if (candidates.length == 1) return candidates.single;
+    if (candidates.length > 1) {
+      // GET /api/sessions/{id} intentionally omits model_config, so an API
+      // session whose model id exists under multiple providers has no
+      // authoritative provider unless this client saved one. Never guess the
+      // first provider: require an explicit tap before Apply is enabled.
+      return null;
+    }
+    return choices.isEmpty ? null : choices.first;
+  }
+
   Future<void> _setSessionModel(_ModelSelection selection) async {
     final desktopGateway = _desktopGateway;
     if (_changingModel || _pendingReattachResync) return;
     final choice = selection.choice;
     setState(() => _changingModel = true);
     try {
-      // Without a gateway there is no session-scoped RPC to push the override
-      // to, so the selection stays local and is sent as the `model` field on
-      // each chat request instead. Reasoning effort is gateway-only and is
-      // simply not applied in that mode.
       if (desktopGateway != null) {
         await desktopGateway.setSessionModel(
           sessionId: widget.session.id,
@@ -2427,6 +2486,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         await desktopGateway.setSessionReasoning(
           sessionId: widget.session.id,
           effort: selection.reasoningEffort,
+        );
+      } else {
+        // The API Server owns this session, so persist the same per-session
+        // lock over :8642 instead of activating the Dashboard transport.
+        // Reasoning effort remains a Desktop Gateway-only control.
+        await _client.setSessionModel(
+          sessionId: widget.session.id,
+          provider: choice.provider,
+          model: choice.model,
+          createSessionIfMissing: widget.session.isLocalDraft,
+          title: widget.session.title,
         );
       }
       final store = await _chatModelStore;
@@ -2567,10 +2637,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     await _gateway.sendMessageStreaming(
       message: text,
       sessionId: widget.session.id,
-      // Carry the per-chat override on the request. The API server resolves
-      // `model` per call, so this reproduces session-scoped model selection
-      // without needing the gateway WebSocket to hold session state.
-      model: _sessionModelOverride ? _sessionModel : null,
+      // API-server-only selections are held by its durable session lock. Keep
+      // those requests on the virtual model so a bare model id cannot lose its
+      // provider identity. Preserve the existing Dashboard fallback behaviour.
+      model: _desktopGateway != null && _sessionModelOverride
+          ? _sessionModel
+          : null,
       history: history,
       imageDataUrl: imageDataUrl,
       onToken: (token) {

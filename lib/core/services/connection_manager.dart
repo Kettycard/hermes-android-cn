@@ -711,6 +711,17 @@ class ApiClient {
     }
   }
 
+  /// Fetches the server-authoritative metadata for one stored session.
+  Future<Map<String, dynamic>> getSession(String sessionId) async {
+    final encodedId = Uri.encodeComponent(sessionId);
+    final data = await apiGet('api/sessions/$encodedId');
+    final session = data['session'];
+    if (session is! Map) {
+      throw const FormatException('Gateway returned no session metadata');
+    }
+    return Map<String, dynamic>.from(session);
+  }
+
   // ── Messages ─────────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getMessages(
@@ -857,10 +868,55 @@ class ApiClient {
     }
   }
 
-  // ── Dashboard-compatible helpers (port 9119 endpoints, may not work on API server) ──
+  // ── Model selection ───────────────────────────────────────────────────
 
+  /// Legacy Dashboard-only profile metadata endpoint.
   Future<Map<String, dynamic>> getModelInfo() => apiGet('api/model/info');
+
+  /// Model inventory exposed by both the Dashboard and API Server.
   Future<Map<String, dynamic>> getModelOptions() => apiGet('api/model/options');
+
+  /// Persists a model lock for one API Server session.
+  Future<Map<String, dynamic>> setSessionModel({
+    required String sessionId,
+    required String provider,
+    required String model,
+    bool createSessionIfMissing = false,
+    String? title,
+  }) async {
+    final body = {
+      'provider': provider,
+      'model': model,
+      'require_model_lock': true,
+    };
+    if (createSessionIfMissing) {
+      final response = await _http
+          .post(
+            Uri.parse('$baseUrl/api/sessions'),
+            headers: _headers,
+            body: jsonEncode({
+              'id': sessionId,
+              'source': 'api_server',
+              if (title?.trim().isNotEmpty == true) 'title': title!.trim(),
+              ...body,
+            }),
+          )
+          .timeout(requestTimeout);
+      if (response.statusCode != 409) {
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        }
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      // A turn or another client may have materialised the local draft while
+      // the picker was open. Apply the lock to that existing row instead.
+    }
+    final encodedId = Uri.encodeComponent(sessionId);
+    return apiPost('api/sessions/$encodedId/model', body: body);
+  }
+
+  // ── Dashboard-compatible helpers (may not work on the API Server) ─────
+
   Future<List<Map<String, dynamic>>> getSkills() async {
     final data = await apiGetList('api/skills');
     return data.whereType<Map<String, dynamic>>().toList();
