@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/session_search_hit.dart';
 import '../services/ai_search_query_rewriter.dart';
 import '../services/chat_space_store.dart';
+import '../services/composer_draft_store.dart';
 import '../services/connection_manager.dart';
 import '../services/desktop_gateway_client.dart';
 import '../services/gateway_turn_application_controller.dart';
@@ -19,6 +20,8 @@ import 'spaces_screen.dart';
 import 'cron_screen.dart';
 import 'skills_screen.dart';
 import 'workspace_screen.dart';
+
+import 'package:hermes_android/core/l10n/l10n.dart';
 
 Future<String?> showSessionNameDialog({
   required BuildContext context,
@@ -41,7 +44,7 @@ Future<String?> showSessionNameDialog({
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('取消'),
+          child: Text(context.l10n.cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext, draft.trim()),
@@ -347,12 +350,14 @@ class _SessionListScreenState extends State<SessionListScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'AI 搜索模型',
+                        context.l10n.ai_search_model,
                         style: Theme.of(sheetContext).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        '该模型只会将你的问题改写为简短的全文检索查询。Hermes 使用主机上已配置的提供商凭据。',
+                      Text(
+                        context
+                            .l10n
+                            .the_model_only_rewrites_your_question_into_a_short_full,
                       ),
                     ],
                   ),
@@ -375,7 +380,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
                         title: Text(choice.model),
                         subtitle: Text(
                           choice.isRecommended
-                              ? '${choice.provider} • 推荐：模型小、成本低'
+                              ? context.l10n.model_recommended(choice.provider)
                               : choice.provider,
                         ),
                         trailing: isSelected
@@ -405,7 +410,9 @@ class _SessionListScreenState extends State<SessionListScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('无法加载 AI 搜索模型：$error')),
+          SnackBar(
+            content: Text(context.l10n.could_not_load_ai_search_models(error)),
+          ),
         );
       }
       return null;
@@ -433,8 +440,8 @@ class _SessionListScreenState extends State<SessionListScreen> {
       if (requestMode == SessionSearchMode.ai) {
         final selected = _aiSearchModel;
         if (selected == null) {
-          throw const AiSearchRewriteException(
-            '使用 AI 搜索前请先选择一个 AI 搜索模型。',
+          throw AiSearchRewriteException(
+            context.l10n.choose_an_ai_search_model_before_using_ai_search,
           );
         }
         effectiveQuery = await _ensureAiRewriter().rewrite(
@@ -470,7 +477,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
     } catch (error) {
       if (!requestIsCurrent()) return;
       setState(() {
-        _searchError = '会话搜索失败：$error';
+        _searchError = context.l10n.session_search_failed(error);
         _serverResults = null;
         _searching = false;
       });
@@ -515,13 +522,16 @@ class _SessionListScreenState extends State<SessionListScreen> {
 
   PopupMenuButton<String> _buildProfileSelector() {
     return PopupMenuButton<String>(
-      tooltip: '切换配置',
+      tooltip: context.l10n.switch_profile,
       icon: const Icon(Icons.account_tree_outlined),
       onSelected: _switchProfile,
       itemBuilder: (context) => [
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           enabled: false,
-          child: Text('配置', style: TextStyle(fontWeight: FontWeight.w700)),
+          child: Text(
+            context.l10n.profile,
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
         ),
         ..._profiles.map(
           (profile) => PopupMenuItem<String>(
@@ -579,9 +589,9 @@ class _SessionListScreenState extends State<SessionListScreen> {
     final gateway = _desktopGateway;
     if (gateway == null) return;
     final title = await _askForName(
-      title: '重命名对话',
+      title: context.l10n.rename_chat,
       initialValue: session.title,
-      actionLabel: '重命名',
+      actionLabel: context.l10n.rename,
     );
     if (title == null || !mounted) return;
     try {
@@ -589,9 +599,9 @@ class _SessionListScreenState extends State<SessionListScreen> {
       await _fetchSessions();
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('无法重命名对话：$error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.could_not_rename_chat(error))),
+      );
     }
   }
 
@@ -603,9 +613,9 @@ class _SessionListScreenState extends State<SessionListScreen> {
     setState(() => _branchingSessionIds.add(session.id));
     try {
       final name = await _askForName(
-        title: '创建对话分支',
-        initialValue: '${session.title} 分支',
-        actionLabel: '创建分支',
+        title: context.l10n.branch_chat,
+        initialValue: '${session.title} branch',
+        actionLabel: context.l10n.create_branch,
       );
       if (name == null || !mounted) return;
       requestedName = name;
@@ -629,8 +639,10 @@ class _SessionListScreenState extends State<SessionListScreen> {
         return;
       }
       final message = error is JsonRpcError && error.code == 4008
-          ? '此对话在 Desktop 会话中尚无可用消息。'
-          : '无法创建对话分支：$error';
+          ? context
+                .l10n
+                .this_chat_has_no_messages_available_in_the_desktop_session
+          : context.l10n.could_not_branch_chat(error);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
@@ -643,7 +655,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
 
   void _showBranchCreated() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已在 Hermes 历史中创建分支。')),
+      SnackBar(content: Text(context.l10n.branch_created_in_hermes_history)),
     );
   }
 
@@ -674,13 +686,13 @@ class _SessionListScreenState extends State<SessionListScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const ListTile(
-              title: Text('移动对话'),
-              subtitle: Text('选择目标空间'),
+            ListTile(
+              title: Text(context.l10n.move_chat),
+              subtitle: Text(context.l10n.choose_its_destination_space),
             ),
             ListTile(
               leading: const Icon(Icons.inbox_outlined),
-              title: const Text('未分配'),
+              title: Text(context.l10n.unassigned),
               onTap: () => Navigator.pop(sheetContext, ''),
             ),
             for (final space in _spaceState.spaces)
@@ -838,9 +850,9 @@ class _SessionListScreenState extends State<SessionListScreen> {
       // Keep the loaded pages; surface the failure and allow a retry on the
       // next scroll instead of losing the list.
       setState(() => _loadingMoreSessions = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('无法加载更多对话：$e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.could_not_load_more_chats(e))),
+      );
     }
   }
 
@@ -855,26 +867,29 @@ class _SessionListScreenState extends State<SessionListScreen> {
 
   Future<void> _confirmDeleteSession(Session session) async {
     final title = session.title.trim().isEmpty
-        ? '未命名会话'
+        ? context.l10n.untitled_session
         : session.title;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('删除会话？'),
+        title: Text(context.l10n.delete_session),
         content: Text(
-          '从远程 Hermes 历史中删除“$title”？此操作无法撤销。',
+          context.l10n
+              .delete_from_the_remote_hermes_history_this_cannot_be_undone(
+                title,
+              ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('取消'),
+            child: Text(context.l10n.cancel),
           ),
           TextButton(
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(dialogContext).colorScheme.error,
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('删除'),
+            child: Text(context.l10n.delete),
           ),
         ],
       ),
@@ -891,6 +906,11 @@ class _SessionListScreenState extends State<SessionListScreen> {
 
     try {
       await _client.deleteSession(session.id);
+      // A deleted session must not leave an orphaned draft behind.
+      await ComposerDraftStore.remove(
+        connectionId: widget.connection.id,
+        sessionId: session.id,
+      );
       await _spaceStore?.assignSession(session.id, null);
       if (_spaceStore != null) {
         _spaceState = await _spaceStore!.load();
@@ -901,14 +921,16 @@ class _SessionListScreenState extends State<SessionListScreen> {
         _deletingSessionIds.remove(session.id);
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已从远程 Hermes 删除会话。')),
+        SnackBar(
+          content: Text(context.l10n.session_deleted_from_remote_hermes),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _deletingSessionIds.remove(session.id));
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('无法删除会话：$e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.could_not_delete_session(e))),
+      );
     }
   }
 
@@ -916,13 +938,14 @@ class _SessionListScreenState extends State<SessionListScreen> {
     final sessionId = GatewayChatClient.generateSessionId();
     final session = Session(
       id: sessionId,
-      title: '新对话',
+      title: context.l10n.new_chat,
       model: 'hermes-agent',
       source: 'mobile',
       messageCount: 0,
       isActive: true,
       preview: '',
       startedAt: DateTime.now().millisecondsSinceEpoch.toDouble() / 1000,
+      isLocalDraft: true,
     );
     if (_spaceScope.kind == ChatSpaceScopeKind.space && _spaceStore != null) {
       await _spaceStore!.assignSession(sessionId, _spaceScope.spaceId);
@@ -957,14 +980,14 @@ class _SessionListScreenState extends State<SessionListScreen> {
 
   String get _spaceScopeLabel {
     return switch (_spaceScope.kind) {
-      ChatSpaceScopeKind.all => '全部对话',
-      ChatSpaceScopeKind.unassigned => '未分配',
+      ChatSpaceScopeKind.all => context.l10n.all_chats,
+      ChatSpaceScopeKind.unassigned => context.l10n.unassigned,
       ChatSpaceScopeKind.space =>
         _spaceState.spaces
                 .where((space) => space.id == _spaceScope.spaceId)
                 .map((space) => space.name)
                 .firstOrNull ??
-            '空间',
+            'Space',
     };
   }
 
@@ -1016,7 +1039,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
       ),
       drawer: _buildDrawer(),
       floatingActionButton: FloatingActionButton(
-        tooltip: '新建对话',
+        tooltip: context.l10n.new_chat,
         onPressed: _createNewSession,
         child: const Icon(Icons.chat, color: Colors.black),
       ),
@@ -1059,7 +1082,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
             ListTile(
               key: const Key('open-spaces'),
               leading: const Icon(Icons.folder_copy_outlined),
-              title: const Text('空间'),
+              title: Text(context.l10n.spaces),
               subtitle: Text(_spaceScopeLabel),
               enabled: _spaceStore != null,
               onTap: () => _openSpaces(closeDrawer: true),
@@ -1067,8 +1090,8 @@ class _SessionListScreenState extends State<SessionListScreen> {
             ListTile(
               key: const Key('open-workspace'),
               leading: const Icon(Icons.dashboard_outlined),
-              title: const Text('工作区'),
-              subtitle: const Text('项目、活动 — 新导航'),
+              title: Text(context.l10n.workspace),
+              subtitle: Text(context.l10n.projects_activity_new_navigation),
               onTap: () {
                 Navigator.pop(context);
                 _openScreen(
@@ -1084,26 +1107,26 @@ class _SessionListScreenState extends State<SessionListScreen> {
             const Divider(),
             ListTile(
               leading: const Icon(Icons.memory),
-              title: const Text('记忆'),
+              title: Text(context.l10n.memory),
               onTap: () =>
                   _openScreen(MemoryScreen(connection: widget.connection)),
             ),
             ListTile(
               leading: const Icon(Icons.schedule),
-              title: const Text('定时任务'),
+              title: Text(context.l10n.cron_jobs),
               onTap: () =>
                   _openScreen(CronScreen(connection: widget.connection)),
             ),
             ListTile(
               leading: const Icon(Icons.auto_awesome),
-              title: const Text('技能'),
+              title: Text(context.l10n.skills),
               onTap: () =>
                   _openScreen(SkillsScreen(connection: widget.connection)),
             ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.settings),
-              title: const Text('设置'),
+              title: Text(context.l10n.settings),
               onTap: () =>
                   _openScreen(SettingsScreen(connection: widget.connection)),
             ),
@@ -1126,17 +1149,22 @@ class _SessionListScreenState extends State<SessionListScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              '正在连接 ${widget.connection.baseUrl}...',
+              context.l10n.connecting_to(widget.connection.baseUrl),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             Text(
-              '请确保网关 API 服务正在运行\n（hermes gateway status 可查看状态）',
+              context
+                  .l10n
+                  .make_sure_the_gateway_api_server_is_running_hermes_gateway,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 24),
-            ElevatedButton(onPressed: _checkHealth, child: const Text('重试')),
+            ElevatedButton(
+              onPressed: _checkHealth,
+              child: Text(context.l10n.retry),
+            ),
           ],
         ),
       );
@@ -1152,7 +1180,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
             Icon(Icons.error_outline, size: 48, color: Colors.orange),
             const SizedBox(height: 16),
             Text(
-              '连接问题',
+              context.l10n.connection_issue,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
@@ -1167,7 +1195,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _fetchSessions,
-              child: const Text('重试'),
+              child: Text(context.l10n.retry),
             ),
           ],
         ),
@@ -1182,12 +1210,12 @@ class _SessionListScreenState extends State<SessionListScreen> {
             Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
-              '暂无会话',
+              context.l10n.no_sessions_yet,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
-              '点击 + 按钮开始新对话',
+              context.l10n.tap_the_button_to_start_a_new_chat,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
@@ -1246,7 +1274,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
                           dimension: 22,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('加载更多…'),
+                      : Text(context.l10n.load_more),
                 ),
               );
             }
@@ -1280,14 +1308,14 @@ class _SessionListScreenState extends State<SessionListScreen> {
                             )
                           : const Icon(Icons.search),
                       hintText: aiMode
-                          ? '让 AI 查找对话'
+                          ? context.l10n.ask_ai_to_find_a_conversation
                           : serverMode
-                          ? '搜索全部消息内容'
-                          : '搜索已加载的对话',
+                          ? context.l10n.search_all_message_content
+                          : context.l10n.search_loaded_chats,
                       trailing: [
                         if (rawQuery.isNotEmpty)
                           IconButton(
-                            tooltip: '清空搜索',
+                            tooltip: context.l10n.clear_search,
                             icon: const Icon(Icons.close),
                             onPressed: () {
                               _searchDebounceTimer?.cancel();
@@ -1304,7 +1332,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
                           ),
                         if (aiMode)
                           IconButton(
-                            tooltip: '更换 AI 搜索模型',
+                            tooltip: context.l10n.change_ai_search_model,
                             icon: _loadingAiModels
                                 ? const SizedBox.square(
                                     dimension: 18,
@@ -1318,7 +1346,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
                                 : _showAiModelSelector,
                           ),
                         PopupMenuButton<SessionSearchMode>(
-                          tooltip: '搜索方式',
+                          tooltip: context.l10n.search_mode,
                           icon: Icon(
                             aiMode
                                 ? Icons.auto_awesome
@@ -1331,22 +1359,26 @@ class _SessionListScreenState extends State<SessionListScreen> {
                             CheckedPopupMenuItem(
                               value: SessionSearchMode.local,
                               checked: !serverMode,
-                              child: const ListTile(
+                              child: ListTile(
                                 contentPadding: EdgeInsets.zero,
                                 leading: Icon(Icons.phone_android),
-                                title: Text('本机'),
-                                subtitle: Text('标题、预览与模型'),
+                                title: Text(context.l10n.on_device),
+                                subtitle: Text(
+                                  context.l10n.titles_previews_and_models,
+                                ),
                               ),
                             ),
                             CheckedPopupMenuItem(
                               value: SessionSearchMode.server,
                               enabled: _serverSearchAvailable,
                               checked: _searchMode == SessionSearchMode.server,
-                              child: const ListTile(
+                              child: ListTile(
                                 contentPadding: EdgeInsets.zero,
                                 leading: Icon(Icons.manage_search),
-                                title: Text('全文'),
-                                subtitle: Text('所有已存储的消息内容'),
+                                title: Text(context.l10n.full_text),
+                                subtitle: Text(
+                                  context.l10n.all_stored_message_content,
+                                ),
                               ),
                             ),
                             CheckedPopupMenuItem(
@@ -1356,10 +1388,12 @@ class _SessionListScreenState extends State<SessionListScreen> {
                               child: ListTile(
                                 contentPadding: EdgeInsets.zero,
                                 leading: const Icon(Icons.auto_awesome),
-                                title: const Text('AI + 全文'),
+                                title: Text(context.l10n.ai_full_text),
                                 subtitle: Text(
                                   _aiSearchModel == null
-                                      ? '选择一个小模型来改写查询'
+                                      ? context
+                                            .l10n
+                                            .choose_a_small_model_to_rewrite_queries
                                       : '${_aiSearchModel!.provider} • ${_aiSearchModel!.model}',
                                 ),
                               ),
@@ -1383,7 +1417,9 @@ class _SessionListScreenState extends State<SessionListScreen> {
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              'AI 搜索了：$_aiRewrittenQuery',
+                              context.l10n.ai_searched_for(
+                                _aiRewrittenQuery ?? '',
+                              ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.bodySmall,
@@ -1422,7 +1458,7 @@ class _SessionListScreenState extends State<SessionListScreen> {
                               TextButton(
                                 onPressed: () =>
                                     _setSearchMode(SessionSearchMode.local),
-                                child: const Text('使用本机搜索'),
+                                child: Text(context.l10n.use_on_device),
                               ),
                             ],
                           ),
@@ -1434,8 +1470,10 @@ class _SessionListScreenState extends State<SessionListScreen> {
                       Center(
                         child: Text(
                           _spaceScope.kind == ChatSpaceScopeKind.space
-                              ? '此空间还没有对话。点击 + 开始。'
-                              : '没有未分配的对话。',
+                              ? context
+                                    .l10n
+                                    .no_chats_in_this_space_yet_tap_to_start_one
+                              : context.l10n.no_unassigned_chats,
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -1447,7 +1485,9 @@ class _SessionListScreenState extends State<SessionListScreen> {
                         serverHitsCurrent != null &&
                         serverHitsCurrent.isEmpty) ...[
                       const SizedBox(height: 16),
-                      const Center(child: Text('无消息内容匹配')),
+                      Center(
+                        child: Text(context.l10n.no_message_content_matches),
+                      ),
                     ],
                   ],
                 ),
@@ -1474,38 +1514,38 @@ class _SessionListScreenState extends State<SessionListScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : PopupMenuButton<String>(
-                        tooltip: '对话操作',
+                        tooltip: context.l10n.chat_actions,
                         onSelected: (action) =>
                             _handleSessionAction(action, session),
                         itemBuilder: (_) => [
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'move',
                             child: ListTile(
                               leading: Icon(Icons.drive_file_move_outline),
-                              title: Text('移动到空间'),
+                              title: Text(context.l10n.move_to_space),
                             ),
                           ),
                           if (_desktopGateway != null)
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'rename',
                               child: ListTile(
                                 leading: Icon(Icons.edit_outlined),
-                                title: Text('重命名'),
+                                title: Text(context.l10n.rename),
                               ),
                             ),
                           if (_desktopGateway != null)
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'branch',
                               child: ListTile(
                                 leading: Icon(Icons.call_split_outlined),
-                                title: Text('分支'),
+                                title: Text(context.l10n.branch),
                               ),
                             ),
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'delete',
                             child: ListTile(
                               leading: Icon(Icons.delete_outline),
-                              title: Text('删除'),
+                              title: Text(context.l10n.delete),
                             ),
                           ),
                         ],
@@ -1519,7 +1559,11 @@ class _SessionListScreenState extends State<SessionListScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${session.messageCount} 条消息 \u2022 ${session.model} \u2022 ${_formatTime(session.startedAt)}',
+                      context.l10n.session_meta(
+                        session.messageCount,
+                        session.model,
+                        _formatTime(session.startedAt),
+                      ),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     if (searchHit?.snippet.isNotEmpty == true)

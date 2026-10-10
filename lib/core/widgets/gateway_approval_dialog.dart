@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/gateway_approval.dart';
 
+import 'package:hermes_android/core/l10n/l10n.dart';
 typedef ApprovalResponder = Future<void> Function(GatewayApprovalChoice choice);
 
 class GatewayApprovalDialog extends StatefulWidget {
@@ -44,29 +45,29 @@ class _GatewayApprovalDialogState extends State<GatewayApprovalDialog> {
       if (!mounted) return;
       setState(() {
         _submitting = null;
-        _error = '无法发送审批：$error';
+        _error = context.l10n.could_not_send_the_approval(error);
       });
     }
   }
 
   String _labelFor(GatewayApprovalChoice choice) {
     return switch (choice) {
-      GatewayApprovalChoice.once => '仅允许一次',
-      GatewayApprovalChoice.session => '本次会话允许',
+      GatewayApprovalChoice.once => context.l10n.allow_once,
+      GatewayApprovalChoice.session => context.l10n.allow_for_this_session,
       GatewayApprovalChoice.always =>
-        _confirmAlways ? '确认永久允许' : '永久允许',
-      GatewayApprovalChoice.deny => '拒绝',
+        _confirmAlways ? context.l10n.confirm_always_allow : context.l10n.always_allow,
+      GatewayApprovalChoice.deny => context.l10n.deny,
     };
   }
 
   String _scopeFor(GatewayApprovalChoice choice) {
     return switch (choice) {
-      GatewayApprovalChoice.once => '仅运行此命令。',
+      GatewayApprovalChoice.once => context.l10n.run_only_this_command,
       GatewayApprovalChoice.session =>
-        '在 Hermes 会话结束前允许匹配的命令。',
+        context.l10n.allow_matching_commands_until_this_hermes_session_ends,
       GatewayApprovalChoice.always =>
-        '在 Hermes 配置中保存一条永久规则。',
-      GatewayApprovalChoice.deny => '不要运行此命令。',
+        context.l10n.save_a_permanent_rule_in_the_hermes_configuration,
+      GatewayApprovalChoice.deny => context.l10n.do_not_run_this_command,
     };
   }
 
@@ -87,7 +88,7 @@ class _GatewayApprovalDialogState extends State<GatewayApprovalDialog> {
 
     return AlertDialog(
       icon: const Icon(Icons.gpp_maybe_outlined),
-      title: const Text('需要审批'),
+      title: Text(context.l10n.approval_needed),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: SingleChildScrollView(
@@ -98,7 +99,7 @@ class _GatewayApprovalDialogState extends State<GatewayApprovalDialog> {
               Text(request.description),
               if (request.command.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text('命令', style: theme.textTheme.labelLarge),
+                Text(context.l10n.command, style: theme.textTheme.labelLarge),
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -117,7 +118,7 @@ class _GatewayApprovalDialogState extends State<GatewayApprovalDialog> {
               if (_confirmAlways) ...[
                 const SizedBox(height: 14),
                 Text(
-                  '这会在 Hermes 中创建一条永久规则。确认前请仔细查看完整命令。',
+                  context.l10n.this_creates_a_permanent_rule_in_hermes_review_the_full,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.error,
                   ),

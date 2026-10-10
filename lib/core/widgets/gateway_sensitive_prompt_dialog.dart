@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/gateway_sensitive_prompt.dart';
 
+import 'package:hermes_android/core/l10n/l10n.dart';
 typedef SensitivePromptResponder = Future<void> Function(String value);
 
 enum GatewaySensitivePromptDialogResult { responded, expired }
@@ -50,7 +51,7 @@ class _GatewaySensitivePromptDialogState
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = 'Hermes 未接受该输入，请重试。';
+        _error = context.l10n.hermes_did_not_accept_the_response_please_try_again;
       });
     }
   }
@@ -102,7 +103,7 @@ class _GatewaySensitivePromptDialogState
             ],
             const SizedBox(height: 10),
             Text(
-              '该值会直接发送到当前连接的 Hermes 网关，不会由本 Android 应用保存。',
+              context.l10n.the_value_is_sent_directly_to_the_active_hermes_gateway,
               style: theme.textTheme.bodySmall,
             ),
           ],
@@ -112,7 +113,7 @@ class _GatewaySensitivePromptDialogState
         TextButton(
           key: const Key('sensitive-prompt-cancel'),
           onPressed: _submitting ? null : () => _respond(''),
-          child: const Text('取消'),
+          child: Text(context.l10n.cancel),
         ),
         FilledButton(
           key: const Key('sensitive-prompt-send'),
@@ -124,7 +125,7 @@ class _GatewaySensitivePromptDialogState
                   dimension: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('发送'),
+              : Text(context.l10n.send),
         ),
       ],
     );

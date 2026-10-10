@@ -46,10 +46,10 @@ class VoiceComposerController extends ChangeNotifier {
         onStatus: _handleStatus,
         onError: _handleError,
       );
-      _status = _available ? null : '语音识别暂不可用';
+      _status = _available ? null : 'Speech recognition is unavailable';
     } catch (error) {
       _available = false;
-      _status = '语音初始化失败：$error';
+      _status = 'Voice setup failed: $error';
     }
     _notify();
     return _available;
@@ -64,7 +64,7 @@ class VoiceComposerController extends ChangeNotifier {
     _configureReplacement(_startValue!, insertion);
     _acceptResults = true;
     _listening = true;
-    _status = '正在聆听';
+    _status = 'Listening';
     _startElapsedTimer();
     _notify();
 
@@ -153,16 +153,16 @@ class VoiceComposerController extends ChangeNotifier {
     _replacementEnd = start + replacement.length;
     if (isFinal) {
       if (_stopping) {
-        _status = '听写完成，可编辑';
+        _status = 'Dictation ready to edit';
         _notify();
         return;
       }
       _acceptResults = false;
-      _finishListening(status: '听写完成，可编辑');
+      _finishListening(status: 'Dictation ready to edit');
       _clearSession();
       unawaited(_stopAdapterAfterFinal());
     } else {
-      _status = '正在聆听';
+      _status = 'Listening';
       _notify();
     }
   }
@@ -184,7 +184,7 @@ class VoiceComposerController extends ChangeNotifier {
     if (normalized == 'listening') {
       if (!_acceptResults) return;
       _listening = true;
-      _status = '正在聆听';
+      _status = 'Listening';
       _notify();
       return;
     }

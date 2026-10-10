@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import '../theme/hermes_theme.dart';
 import 'hermes_components.dart';
 
+import 'package:hermes_android/core/l10n/l10n.dart';
 /// Whether a More entry can be opened right now, and why not when it cannot.
 enum MoreEntryAvailability {
   /// Usable now.
@@ -73,102 +74,103 @@ class MoreSection {
   const MoreSection({required this.title, required this.entries});
 }
 
-const _dashboardRequired =
-    '需要可访问的 Hermes 仪表盘。请检查此连接的主机、端口和凭据。';
-const _gatewayAssetsRequired = '需要 Hermes 网关提供服务器端权威的资产索引。';
-const _gatewayOrganizationRequired =
-    '需要 Hermes 网关提供持久的置顶排序、批量修改和撤销契约。';
-const _gatewayAiFilingRequired = '需要 Hermes 网关提供具备纠正能力的归档契约。';
-
 /// Builds the More menu for the current connection.
 ///
 /// [dashboardReachable] gates the surfaces served by the Hermes Dashboard.
 /// Local device settings stay reachable regardless, so the user can always
 /// repair a broken connection from inside the app.
-List<MoreSection> buildMoreSections({required bool dashboardReachable}) {
+List<MoreSection> buildMoreSections({
+  required bool dashboardReachable,
+  required AppLocalizations l10n,
+}) {
   MoreEntryAvailability dashboardBacked() => dashboardReachable
       ? MoreEntryAvailability.available
       : MoreEntryAvailability.unavailable;
-  String? dashboardReason() => dashboardReachable ? null : _dashboardRequired;
+  String? dashboardReason() => dashboardReachable
+      ? null
+      : l10n.needs_a_reachable_hermes_dashboard_check_the_host_port_and;
 
   return [
     MoreSection(
-      title: '工作区',
+      title: l10n.workspace,
       entries: [
-        const MoreEntry(
+        MoreEntry(
           id: 'unassigned',
-          title: '未分配对话',
-          subtitle: '尚未分配到项目的对话',
+          title: l10n.unassigned_chats,
+          subtitle: l10n.chats_that_are_not_assigned_to_a_project,
           icon: Icons.inbox_outlined,
         ),
-        const MoreEntry(
+        MoreEntry(
           id: 'archived-quick',
-          title: '已归档的快捷对话',
-          subtitle: '查看或恢复超过保留期的快捷对话',
+          title: l10n.archived_quick_chats,
+          subtitle: l10n.review_or_promote_quick_chats_past_their_retention_period,
           icon: Icons.archive_outlined,
         ),
         MoreEntry(
           id: 'files',
-          title: '文件',
-          subtitle: '浏览项目背后的 miniserver 文件夹',
+          title: l10n.files,
+          subtitle: l10n.browse_the_miniserver_folders_behind_your_projects,
           icon: Icons.folder_open_outlined,
           availability: dashboardBacked(),
           unavailableReason: dashboardReason(),
         ),
-        const MoreEntry(
+        MoreEntry(
           id: 'assets',
-          title: '资产',
-          subtitle: '产物、附件和生成的媒体',
+          title: l10n.assets,
+          subtitle: l10n.artifacts_attachments_and_generated_media,
           icon: Icons.image_outlined,
           availability: MoreEntryAvailability.unavailable,
-          unavailableReason: _gatewayAssetsRequired,
-        ),
-      ],
-    ),
-    const MoreSection(
-      title: '整理',
-      entries: [
-        MoreEntry(
-          id: 'pin-batch-undo',
-          title: '置顶、批量与撤销',
-          subtitle: '跨设备排序和可逆的批量整理',
-          icon: Icons.push_pin_outlined,
-          availability: MoreEntryAvailability.unavailable,
-          unavailableReason: _gatewayOrganizationRequired,
-        ),
-        MoreEntry(
-          id: 'ai-filing',
-          title: 'AI 辅助归档',
-          subtitle: '建议项目并从你的纠正中学习',
-          icon: Icons.auto_fix_high_outlined,
-          availability: MoreEntryAvailability.unavailable,
-          unavailableReason: _gatewayAiFilingRequired,
+          unavailableReason:
+              l10n.needs_a_server_authoritative_assets_index_in_the_hermes_gateway,
         ),
       ],
     ),
     MoreSection(
-      title: '自动化',
+      title: l10n.organization,
+      entries: [
+        MoreEntry(
+          id: 'pin-batch-undo',
+          title: l10n.pin_batch_and_undo,
+          subtitle: l10n.cross_device_ordering_and_reversible_bulk_organization,
+          icon: Icons.push_pin_outlined,
+          availability: MoreEntryAvailability.unavailable,
+          unavailableReason:
+              l10n.needs_durable_pin_ordering_batch_mutation_and_undo_contracts_in,
+        ),
+        MoreEntry(
+          id: 'ai-filing',
+          title: l10n.ai_assisted_filing,
+          subtitle: l10n.suggest_projects_and_learn_from_your_corrections,
+          icon: Icons.auto_fix_high_outlined,
+          availability: MoreEntryAvailability.unavailable,
+          unavailableReason:
+              l10n.needs_a_correction_aware_filing_contract_in_the_hermes_gateway,
+        ),
+      ],
+    ),
+    MoreSection(
+      title: l10n.automation,
       entries: [
         MoreEntry(
           id: 'cron',
-          title: '定时任务',
-          subtitle: '计划任务及其最近一次运行',
+          title: l10n.cron,
+          subtitle: l10n.scheduled_jobs_and_their_last_runs,
           icon: Icons.schedule_outlined,
           availability: dashboardBacked(),
           unavailableReason: dashboardReason(),
         ),
         MoreEntry(
           id: 'skills',
-          title: '技能与工具',
-          subtitle: 'Hermes 能做到什么',
+          title: l10n.skills_and_tools,
+          subtitle: l10n.what_hermes_knows_how_to_do,
           icon: Icons.auto_awesome_outlined,
           availability: dashboardBacked(),
           unavailableReason: dashboardReason(),
         ),
         MoreEntry(
           id: 'memory',
-          title: '记忆',
-          subtitle: 'Hermes 记住的关于你的持久事实',
+          title: l10n.memory,
+          subtitle: l10n.durable_facts_hermes_keeps_about_you,
           icon: Icons.psychology_outlined,
           availability: dashboardBacked(),
           unavailableReason: dashboardReason(),
@@ -176,18 +178,19 @@ List<MoreSection> buildMoreSections({required bool dashboardReachable}) {
       ],
     ),
     MoreSection(
-      title: '系统',
+      title: l10n.system,
       entries: [
-        const MoreEntry(
+        MoreEntry(
           id: 'settings',
-          title: '设置',
-          subtitle: '连接、外观和设备偏好',
+          title: l10n.settings,
+          subtitle: l10n.connection_appearance_and_device_preferences,
           icon: Icons.settings_outlined,
         ),
         MoreEntry(
           id: 'dashboard',
-          title: '打开 Hermes 仪表盘',
-          subtitle: '尚未原生化的功能都在经过身份验证的网页仪表盘中',
+          title: l10n.open_the_hermes_dashboard,
+          subtitle:
+              l10n.everything_not_yet_native_in_the_authenticated_web_dashboard,
           icon: Icons.open_in_new,
           availability: dashboardBacked(),
           unavailableReason: dashboardReason(),
@@ -283,9 +286,9 @@ class _MoreEntryCard extends StatelessWidget {
                       ),
                       if (entry.availability ==
                           MoreEntryAvailability.comingSoon)
-                        const StatusChip(
+                        StatusChip(
                           status: HermesStatus.idle,
-                          label: '即将推出',
+                          label: context.l10n.coming_next,
                         ),
                     ],
                   ),

@@ -151,6 +151,11 @@ class _GatewayFixture {
       socket.listen(
         (raw) async {
           final request = jsonDecode(raw as String) as Map<String, dynamic>;
+          // WsClient negotiates interactive server requests for every socket.
+          // This fixture exercises turn recovery, so exclude that independent,
+          // best-effort negotiation from turn request assertions. Dedicated
+          // transport tests cover its response contract.
+          if (request['method'] == 'client.capabilities') return;
           requests.add(request);
           order.add(request['method'] as String);
           final result = await (handler == null
@@ -617,7 +622,196 @@ void _expectPayloadFreePoison(GatewayTurnRecoveryState? failure) {
   expect(failure.snapshot, isNull);
 }
 
+Future<void> _waitFor(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!condition()) {
+    if (DateTime.now().isAfter(deadline)) {
+      throw StateError('condition not met within $timeout');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
+}
+
 void main() {
+  test(
+    'registry binding listeners are session-scoped and token-owned',
+    () async {
+      final fixture = await _GatewayFixture.start();
+      final registry = GatewayTurnCoordinatorRegistry(
+        connectionId: 'connection-a',
+        endpointDigest: _digest,
+        journal: GatewayTurnJournal(store: _MemoryJournalStore()),
+        freshSocketFactory: () async => WsClient(fixture.baseUrl),
+      );
+      final delivered = <(String, String, String)>[];
+      final oldA = registry.setSessionBoundListener(
+        'local-a',
+        (local, stored) => delivered.add(('stale-a', local, stored)),
+      );
+      final currentA = registry.setSessionBoundListener(
+        'local-a',
+        (local, stored) => delivered.add(('current-a', local, stored)),
+      );
+      // A late dispose from the replaced route must not remove its successor.
+      registry.removeSessionBoundListener('local-a', oldA);
+      registry.setSessionBoundListener(
+        'local-b',
+        (local, stored) => delivered.add(('session-b', local, stored)),
+      );
+
+      try {
+        await registry.open('local-a');
+        await registry.open('local-b');
+
+        expect(delivered, [
+          ('current-a', 'local-a', 'stored-1'),
+          ('session-b', 'local-b', 'stored-2'),
+        ]);
+
+        registry.setSessionBoundListener(
+          'local-a',
+          (local, stored) => delivered.add(('replacement-a', local, stored)),
+        );
+        registry.removeSessionBoundListener('local-a', currentA);
+        expect(delivered.last, ('replacement-a', 'local-a', 'stored-1'));
+      } finally {
+        await registry.closeAll();
+        await fixture.close();
+      }
+    },
+  );
+
+  test(
+    'registry settlement listeners are session-scoped and token-owned',
+    () async {
+      final fixture = await _GatewayFixture.start();
+      var uuidIndex = 0;
+      final registry = GatewayTurnCoordinatorRegistry(
+        connectionId: 'connection-a',
+        endpointDigest: _digest,
+        journal: GatewayTurnJournal(store: _MemoryJournalStore()),
+        freshSocketFactory: () async => WsClient(fixture.baseUrl),
+        uuidFactory: () => _uuidFor(++uuidIndex),
+      );
+      final delivered = <String>[];
+      final oldA = registry.setTurnSettledListener(
+        'local-a',
+        (_) => delivered.add('stale-a'),
+      );
+      registry.setTurnSettledListener(
+        'local-a',
+        (_) => delivered.add('current-a'),
+      );
+      // A late dispose from the replaced route must not remove its successor.
+      registry.removeTurnSettledListener('local-a', oldA);
+      final sessionB = registry.setTurnSettledListener(
+        'local-b',
+        (_) => delivered.add('session-b'),
+      );
+
+      try {
+        final stateA = await registry.submit(
+          localSessionId: 'local-a',
+          text: 'alpha',
+        );
+        final stateB = await registry.submit(
+          localSessionId: 'local-b',
+          text: 'beta',
+        );
+        registry.removeTurnSettledListener('local-b', sessionB);
+
+        fixture.sendEvent(
+          _liveEventParams(
+            type: 'message.start',
+            turnId: stateA.turnId!,
+            seq: 1,
+            payload: <String, dynamic>{},
+          ),
+        );
+        fixture.sendEvent(
+          _liveEventParams(
+            type: 'turn.status',
+            turnId: stateA.turnId!,
+            seq: 2,
+            payload: <String, dynamic>{'status': 'completed'},
+          ),
+        );
+        fixture.sendEvent(
+          _liveEventParams(
+            type: 'message.start',
+            turnId: stateB.turnId!,
+            seq: 1,
+            payload: <String, dynamic>{},
+            sessionId: 'runtime-2',
+          ),
+          socketIndex: 1,
+        );
+        fixture.sendEvent(
+          _liveEventParams(
+            type: 'turn.status',
+            turnId: stateB.turnId!,
+            seq: 2,
+            payload: <String, dynamic>{'status': 'completed'},
+            sessionId: 'runtime-2',
+          ),
+          socketIndex: 1,
+        );
+
+        await _waitFor(() => delivered.isNotEmpty);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(delivered, ['current-a']);
+      } finally {
+        await registry.closeAll();
+        await fixture.close();
+      }
+    },
+  );
+
+  test(
+    'coordinator reports runtime binding and preserves inherited events',
+    () async {
+      final fixture = await _GatewayFixture.start();
+      addTearDown(fixture.close);
+      final inheritedEvents = <StreamEvent>[];
+      final runtimeBindings = <String, String>{};
+      final coordinator =
+          GatewayTurnCoordinator(
+              connectionId: 'connection-a',
+              endpointDigest: _digest,
+              localSessionId: 'local-a',
+              journal: GatewayTurnJournal(store: _MemoryJournalStore()),
+              freshSocketFactory: () async {
+                final client = WsClient(fixture.baseUrl);
+                client.onStreamEvent = inheritedEvents.add;
+                return client;
+              },
+              uuidFactory: () => _clientA,
+              clock: () => DateTime.fromMillisecondsSinceEpoch(
+                _baseMs + 1000,
+                isUtc: true,
+              ),
+            )
+            ..onRuntimeBound = (localSessionId, runtimeSessionId) {
+              runtimeBindings[localSessionId] = runtimeSessionId;
+            };
+      addTearDown(coordinator.close);
+
+      await coordinator.ensureOpen();
+      expect(runtimeBindings, {'local-a': 'runtime-1'});
+
+      fixture.sendEvent({
+        'type': 'request.cancel',
+        'session_id': 'runtime-1',
+        'payload': {'id': 'srq-1', 'method': 'clarify'},
+      });
+      await _waitFor(() => inheritedEvents.isNotEmpty);
+      expect(inheritedEvents.single.type, 'request.cancel');
+    },
+  );
+
   group('GatewayTurnRecoveryState rehydrate', () {
     test('accepts unresolved and known nonterminal durable states', () {
       final unresolved = GatewayTurnRecoveryState.rehydrate(
@@ -2242,50 +2436,41 @@ void main() {
       },
     );
 
-    test(
-      'v2 protocol without turn_recovery is also a clean absence',
-      () async {
-        final ready = _readyFrame();
-        final payload =
-            (ready['params'] as Map<String, dynamic>)['payload']
-                as Map<String, dynamic>;
-        (payload['capabilities'] as Map<String, dynamic>).remove(
-          'turn_recovery',
-        );
-        final fixture = await _GatewayFixture.start(
-          readyFrame: ready,
-          handler: (request, _) => throw StateError(
-            'Unsupported ready must not call ${request['method']}',
+    test('v2 protocol without turn_recovery is also a clean absence', () async {
+      final ready = _readyFrame();
+      final payload =
+          (ready['params'] as Map<String, dynamic>)['payload']
+              as Map<String, dynamic>;
+      (payload['capabilities'] as Map<String, dynamic>).remove('turn_recovery');
+      final fixture = await _GatewayFixture.start(
+        readyFrame: ready,
+        handler: (request, _) => throw StateError(
+          'Unsupported ready must not call ${request['method']}',
+        ),
+      );
+      final coordinator = _coordinator(
+        fixture: fixture,
+        journal: GatewayTurnJournal(store: _MemoryJournalStore()),
+      );
+
+      try {
+        await expectLater(
+          coordinator.recoverPending(),
+          throwsA(
+            isA<GatewayTurnCoordinatorException>()
+                .having(
+                  (error) => error.failure,
+                  'failure',
+                  GatewayTurnCoordinatorFailure.unsupportedCapability,
+                )
+                .having((error) => error.stockGateway, 'stockGateway', isTrue),
           ),
         );
-        final coordinator = _coordinator(
-          fixture: fixture,
-          journal: GatewayTurnJournal(store: _MemoryJournalStore()),
-        );
-
-        try {
-          await expectLater(
-            coordinator.recoverPending(),
-            throwsA(
-              isA<GatewayTurnCoordinatorException>()
-                  .having(
-                    (error) => error.failure,
-                    'failure',
-                    GatewayTurnCoordinatorFailure.unsupportedCapability,
-                  )
-                  .having(
-                    (error) => error.stockGateway,
-                    'stockGateway',
-                    isTrue,
-                  ),
-            ),
-          );
-        } finally {
-          await coordinator.close();
-          await fixture.close();
-        }
-      },
-    );
+      } finally {
+        await coordinator.close();
+        await fixture.close();
+      }
+    });
 
     test(
       'a wrong protocol name is a mismatch, never a clean absence',
@@ -2294,8 +2479,7 @@ void main() {
         final payload =
             (ready['params'] as Map<String, dynamic>)['payload']
                 as Map<String, dynamic>;
-        (payload['protocol'] as Map<String, dynamic>)['name'] =
-            'not-hermes';
+        (payload['protocol'] as Map<String, dynamic>)['name'] = 'not-hermes';
         final fixture = await _GatewayFixture.start(
           readyFrame: ready,
           handler: (request, _) => throw StateError(
@@ -3220,7 +3404,7 @@ void main() {
     );
 
     test(
-      'onSessionBound fires once when a fresh draft gains its stored id',
+      'onSessionBound reports every authoritative durable binding',
       () async {
         late _GatewayFixture fixture;
         var opens = 0;
@@ -3253,13 +3437,13 @@ void main() {
           // reconcile records keyed by the draft id.
           expect(bounds, [('local-a', 'stored-a')]);
 
-          // A reconnect reuses the same binding; the callback must not re-fire
-          // (the assignment it drives is idempotent but should not spam).
+          // A reconnect advances the authoritative binding version. Metadata
+          // consumers must hear about it even though the stored id is stable.
           await fixture.closeSocket();
           await fixture.waitForSocketClosed();
           await coordinator.waitForIdle();
           await coordinator.ensureOpen();
-          expect(bounds, hasLength(1));
+          expect(bounds, [('local-a', 'stored-a'), ('local-a', 'stored-a')]);
         } finally {
           await coordinator.close();
           await fixture.close();

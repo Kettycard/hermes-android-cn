@@ -1,14 +1,20 @@
 // Settings screen for model selection, theme toggle, and app info.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/config_backup_io.dart';
 import '../services/config_backup_service.dart';
 import '../services/connection_manager.dart';
+import '../services/notification_prefs.dart';
+import '../services/turn_notification_service.dart';
 import '../widgets/config_backup_card.dart';
 import '../widgets/text_size_settings_card.dart';
 import '../../main.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+
+import 'package:hermes_android/core/l10n/l10n.dart';
 
 class SettingsScreen extends StatefulWidget {
   final SavedConnection connection;
@@ -132,8 +138,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _client.setModel('main', _selectedProvider, _selectedModel);
       if (!mounted) return;
       setState(() {
-        _successMsg =
-            '配置默认模型已设为 $_selectedModel。已有独立模型设置的对话将保留各自设置。';
+        _successMsg = context.l10n
+            .profile_default_set_to_chats_with_their_own_model_keep(
+              _selectedModel,
+            );
       });
     } catch (e) {
       if (!mounted) return;
@@ -147,12 +155,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('设置'),
+        title: Text(context.l10n.settings),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _loadData,
-            tooltip: '刷新',
+            tooltip: context.l10n.refresh,
           ),
         ],
       ),
@@ -175,7 +183,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Icon(Icons.error_outline, size: 48, color: Colors.orange),
               const SizedBox(height: 16),
               Text(
-                '加载设置失败',
+                context.l10n.failed_to_load_settings,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
@@ -185,7 +193,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              ElevatedButton(onPressed: _loadData, child: const Text('重试')),
+              ElevatedButton(
+                onPressed: _loadData,
+                child: Text(context.l10n.retry),
+              ),
             ],
           ),
         ),
@@ -196,9 +207,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         // ---- Section: Model ----
-        _buildSectionHeader('配置默认模型'),
+        _buildSectionHeader(context.l10n.profile_default_model),
         Text(
-          '更改 ${widget.connection.label} 的默认模型。在对话中使用选择器可仅覆盖该对话。',
+          context.l10n.changes_the_default_for_use_the_selector_in_a_chat(
+            widget.connection.label,
+          ),
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 8),
@@ -217,14 +230,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '当前配置默认',
+                        context.l10n.current_profile_default,
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${_modelInfo!['model'] ?? '???'}  \n提供商：`${_modelInfo!['provider'] ?? '???'}`',
+                    context.l10n.model_via_provider(
+                      _modelInfo!['model'] ?? '???',
+                      _modelInfo!['provider'] ?? '???',
+                    ),
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   if (_modelInfo!['effective_context_length'] != null &&
@@ -232,7 +248,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        '上下文：${_modelInfo!['effective_context_length']} tokens',
+                        context.l10n.context_tokens(
+                          _modelInfo!['effective_context_length'],
+                        ),
                         style: Theme.of(
                           context,
                         ).textTheme.bodySmall?.copyWith(color: Colors.grey),
@@ -247,7 +265,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // Provider picker
         if (_providers.isNotEmpty) ...[
           _buildDropdown<String>(
-            label: '提供商',
+            label: context.l10n.provider,
             value:
                 _selectedProvider.isNotEmpty &&
                     _providers.contains(_selectedProvider)
@@ -276,7 +294,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (_selectedProvider.isNotEmpty &&
             _providerModels.containsKey(_selectedProvider)) ...[
           _buildDropdown<String>(
-            label: '模型',
+            label: context.l10n.model,
             value: _selectedModel,
             items: _providerModels[_selectedProvider]!.map((m) {
               final id = m['id'] as String? ?? '';
@@ -293,7 +311,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: FilledButton.icon(
               onPressed: _applyModel,
               icon: const Icon(Icons.check),
-              label: const Text('设为配置默认'),
+              label: Text(context.l10n.set_profile_default),
             ),
           ),
         ],
@@ -323,7 +341,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 16),
 
         // ---- Section: Theme ----
-        _buildSectionHeader('外观'),
+        _buildSectionHeader(context.l10n.appearance),
         _ThemeToggle(),
         const SizedBox(height: 8),
         TextSizeSettingsCard(
@@ -340,33 +358,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _VerboseToggle(),
         const SizedBox(height: 16),
 
+        // ---- Section: Notifications ----
+        _buildSectionHeader(context.l10n.notifications),
+        const _NotificationSettings(),
+        const SizedBox(height: 16),
+
         const SizedBox(height: 16),
 
         // ---- Section: Voice ----
-        _buildSectionHeader('语音'),
+        _buildSectionHeader(context.l10n.voice),
         _VoicePicker(),
         const SizedBox(height: 16),
 
         // ---- Section: Session Sources ----
-        _buildSectionHeader('会话来源'),
+        _buildSectionHeader(context.l10n.session_sources),
         _SessionSourcesFilter(connectionId: widget.connection.id),
         const SizedBox(height: 16),
 
         // ---- Section: Connection ----
-        _buildSectionHeader('连接'),
+        _buildSectionHeader(context.l10n.connection_section),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _infoRow('标签', widget.connection.label),
+                _infoRow(context.l10n.label, widget.connection.label),
                 const SizedBox(height: 4),
-                _infoRow('主机', widget.connection.host),
+                _infoRow(context.l10n.host, widget.connection.host),
                 const SizedBox(height: 4),
-                _infoRow('端口', '${widget.connection.port}'),
+                _infoRow(context.l10n.port, '${widget.connection.port}'),
                 const SizedBox(height: 4),
-                _infoRow('Base URL', widget.connection.baseUrl),
+                _infoRow(context.l10n.base_url, widget.connection.baseUrl),
               ],
             ),
           ),
@@ -374,7 +397,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 16),
 
         // ---- Section: Backup ----
-        _buildSectionHeader('备份与恢复'),
+        _buildSectionHeader(context.l10n.backup_restore),
         ConfigBackupCard(
           onExport: _exportConfig,
           onDeliverExport: _deliverExport,
@@ -384,7 +407,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 16),
 
         // ---- Section: About ----
-        _buildSectionHeader('关于'),
+        _buildSectionHeader(context.l10n.about),
         _AboutCard(),
       ],
     );
@@ -499,7 +522,7 @@ class _AboutCardState extends State<_AboutCard> {
       setState(() => _version = '${info.version}+${info.buildNumber}');
     } catch (_) {
       if (!mounted) return;
-      setState(() => _version = '未知');
+      setState(() => _version = 'unknown');
     }
   }
 
@@ -511,15 +534,19 @@ class _AboutCardState extends State<_AboutCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '安卓版 Hermes 智能体',
+            Text(
+              context.l10n.hermes_agent_for_android,
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
-            Text('版本 ${_version.isNotEmpty ? _version : '…'}'),
+            Text(
+              context.l10n.version_label(_version.isNotEmpty ? _version : '…'),
+            ),
             const SizedBox(height: 8),
-            const Text(
-              '在手机上浏览和管理你的 Hermes Agent 会话。连接到本地网络中运行的 Hermes 仪表盘。',
+            Text(
+              context
+                  .l10n
+                  .browse_and_manage_your_hermes_agent_sessions_from_your_phone,
               style: TextStyle(color: Colors.grey),
             ),
           ],
@@ -559,8 +586,10 @@ class _VerboseToggleState extends State<_VerboseToggle> {
   Widget build(BuildContext context) {
     return Card(
       child: SwitchListTile(
-        title: const Text('详细模式'),
-        subtitle: const Text('显示工具调用、思考和消息元数据'),
+        title: Text(context.l10n.verbose_mode),
+        subtitle: Text(
+          context.l10n.show_tool_calls_thinking_and_message_metadata,
+        ),
         secondary: const Icon(Icons.terminal),
         value: _verbose,
         onChanged: _set,
@@ -602,20 +631,20 @@ class _ThemeToggleState extends State<_ThemeToggle> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: SegmentedButton<String>(
-        segments: const [
+        segments: [
           ButtonSegment(
             value: 'system',
-            label: Text('系统'),
+            label: Text(context.l10n.system),
             icon: Icon(Icons.brightness_auto, size: 18),
           ),
           ButtonSegment(
             value: 'dark',
-            label: Text('深色'),
+            label: Text(context.l10n.dark),
             icon: Icon(Icons.dark_mode, size: 18),
           ),
           ButtonSegment(
             value: 'light',
-            label: Text('浅色'),
+            label: Text(context.l10n.light),
             icon: Icon(Icons.light_mode, size: 18),
           ),
         ],
@@ -707,9 +736,9 @@ class _VoicePickerState extends State<_VoicePicker> {
     final locale = voice['locale'] ?? '';
     if (name == locale) return locale;
     final gender = name.contains('male')
-        ? '(男)'
+        ? '(male)'
         : name.contains('female')
-        ? '(女)'
+        ? '(female)'
         : '';
     return '$locale $gender  [$name]';
   }
@@ -726,12 +755,11 @@ class _VoicePickerState extends State<_VoicePicker> {
     }
 
     if (_voices.isEmpty) {
-      return const Card(
+      return Card(
         child: Padding(
           padding: EdgeInsets.all(16),
           child: Text(
-            '未找到 TTS 语音。\\n'
-            '请安装 Google 文字转语音并下载语音数据。',
+            context.l10n.no_tts_voices_found_ninstall_google_text_to_speech_and,
             style: TextStyle(color: Colors.grey),
           ),
         ),
@@ -739,7 +767,10 @@ class _VoicePickerState extends State<_VoicePicker> {
     }
 
     final items = <DropdownMenuItem<Map<String, String>?>>[
-      const DropdownMenuItem(value: null, child: Text('自动（设备默认）')),
+      DropdownMenuItem(
+        value: null,
+        child: Text(context.l10n.auto_device_default),
+      ),
       ..._voices.map(
         (v) => DropdownMenuItem(
           value: v,
@@ -758,8 +789,8 @@ class _VoicePickerState extends State<_VoicePicker> {
 
     return DropdownButtonFormField<Map<String, String>?>(
       initialValue: current,
-      decoration: const InputDecoration(
-        labelText: '语音',
+      decoration: InputDecoration(
+        labelText: context.l10n.voice,
         border: OutlineInputBorder(),
         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
@@ -782,21 +813,21 @@ class _SessionSourcesFilter extends StatefulWidget {
 class _SessionSourcesFilterState extends State<_SessionSourcesFilter> {
   /// Known session source types. Hermes Gateway persists `session.source` for
   /// every session. Sources not in this list are always shown (whitelisted).
-  static const Map<String, String> _knownSources = {
-    'acp': '自主智能体',
-    'api_server': '外部 API 客户端',
-    'cli': '命令行对话',
-    'cron': '定时任务',
-    'desktop': '桌面应用',
-    'discord': 'Discord 对话',
-    'gateway': '网关 API 访问',
-    'mobile': '手机或平板',
-    'signal': 'Signal 消息',
-    'slack': 'Slack 对话',
-    'telegram': 'Telegram 消息',
-    'tool': '开发者工具调用',
-    'tui': '终端会话',
-    'whatsapp': 'WhatsApp 消息',
+  Map<String, String> get _knownSources => {
+    'acp': context.l10n.autonomous_agents,
+    'api_server': context.l10n.external_api_clients,
+    'cli': context.l10n.command_line_chats,
+    'cron': context.l10n.scheduled_tasks,
+    'desktop': context.l10n.desktop_app,
+    'discord': context.l10n.discord_chats,
+    'gateway': context.l10n.gateway_api_access,
+    'mobile': context.l10n.phone_or_tablet,
+    'signal': context.l10n.signal_messages,
+    'slack': context.l10n.slack_chats,
+    'telegram': context.l10n.telegram_messages,
+    'tool': context.l10n.developer_tool_calls,
+    'tui': context.l10n.terminal_sessions,
+    'whatsapp': context.l10n.whatsapp_messages,
   };
 
   Set<String> _excluded = {};
@@ -848,6 +879,128 @@ class _SessionSourcesFilterState extends State<_SessionSourcesFilter> {
             controlAffinity: ListTileControlAffinity.leading,
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+/// Desktop-parity notification settings: one master switch, a toggle per kind,
+/// and the same "send test" affordance so a silent OS-level block is visible
+/// instead of looking like a dead feature.
+class _NotificationSettings extends StatefulWidget {
+  const _NotificationSettings();
+
+  @override
+  State<_NotificationSettings> createState() => _NotificationSettingsState();
+}
+
+class _NotificationSettingsState extends State<_NotificationSettings> {
+  @override
+  void initState() {
+    super.initState();
+    // Resolve the Android 13+ permission state so a denied app shows the hint
+    // instead of looking silently broken.
+    unawaited(
+      TurnNotificationService.shared.ensureInitialized().then((_) {
+        if (mounted) setState(() {});
+      }),
+    );
+  }
+
+  static String _kindLabel(BuildContext context, HermesNotificationKind kind) =>
+      switch (kind) {
+        HermesNotificationKind.approval => context.l10n.approval_needed,
+        HermesNotificationKind.input => context.l10n.input_needed,
+        HermesNotificationKind.turnDone => context.l10n.response_complete,
+        HermesNotificationKind.turnError => context.l10n.turn_failed,
+        HermesNotificationKind.backgroundDone =>
+          context.l10n.background_task_completed,
+        HermesNotificationKind.credits => context.l10n.credit_notifications,
+        HermesNotificationKind.plugin => context.l10n.plugin_notifications,
+      };
+
+  static String _kindDescription(
+    BuildContext context,
+    HermesNotificationKind kind,
+  ) => switch (kind) {
+    HermesNotificationKind.approval => context.l10n.approval_needed_description,
+    HermesNotificationKind.input => context.l10n.input_needed_description,
+    HermesNotificationKind.turnDone =>
+      context.l10n.response_complete_description,
+    HermesNotificationKind.turnError => context.l10n.turn_failed_description,
+    HermesNotificationKind.backgroundDone =>
+      context.l10n.background_task_completed_description,
+    HermesNotificationKind.credits =>
+      context.l10n.credit_notifications_description,
+    HermesNotificationKind.plugin =>
+      context.l10n.plugin_notifications_description,
+  };
+
+  Future<void> _sendTest() async {
+    final ok = await TurnNotificationService.shared.sendTestNotification(
+      title: context.l10n.test_notification_title,
+      body: context.l10n.test_notification_body,
+    );
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? context.l10n.test_notification_sent
+                : context.l10n.test_notification_unsupported,
+          ),
+        ),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<NotificationPrefs>(
+      valueListenable: notificationPrefs,
+      builder: (context, prefs, _) => Card(
+        child: Column(
+          children: [
+            SwitchListTile(
+              secondary: const Icon(Icons.notifications_outlined),
+              title: Text(context.l10n.enable_notifications),
+              subtitle: Text(context.l10n.enable_notifications_description),
+              value: prefs.enabled,
+              onChanged: (on) =>
+                  unawaited(NotificationPrefsStore.setEnabled(on)),
+            ),
+            for (final kind in HermesNotificationKind.values) ...[
+              const Divider(height: 1),
+              SwitchListTile(
+                title: Text(_kindLabel(context, kind)),
+                subtitle: Text(_kindDescription(context, kind)),
+                value: prefs.enabled && prefs.kinds[kind] == true,
+                onChanged: prefs.enabled
+                    ? (on) =>
+                          unawaited(NotificationPrefsStore.setKind(kind, on))
+                    : null,
+              ),
+            ],
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.send_outlined),
+              title: Text(context.l10n.send_test_notification),
+              onTap: () => unawaited(_sendTest()),
+            ),
+            if (!TurnNotificationService.shared.permissionGranted) ...[
+              const Divider(height: 1),
+              ListTile(
+                leading: Icon(
+                  Icons.warning_amber_outlined,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                title: Text(context.l10n.notifications_permission_denied),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

@@ -98,9 +98,9 @@ class GatewayNotice {
   String get title => switch (kind) {
     GatewayNoticeKind.background =>
       taskId == null
-          ? '后台任务已完成'
-          : '后台任务 $taskId 已完成',
-    GatewayNoticeKind.review => 'Hermes 审查',
+          ? 'Background task completed'
+          : 'Background task $taskId completed',
+    GatewayNoticeKind.review => 'Hermes review',
   };
 
   static GatewayNotice? fromGatewayEvent(
@@ -218,7 +218,7 @@ class GatewaySubagentActivity {
         'task-${data['task_index'] ?? 0}';
     final goal =
         GatewayNotice.safeLine(data['goal']?.toString(), 500) ??
-        '委派任务';
+        'Delegated task';
     final detail = GatewayNotice.safeLine(
       (data['summary'] ??
               data['text'] ??

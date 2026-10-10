@@ -67,22 +67,24 @@ class SessionSearchClient {
     try {
       response = await _http.get(uri, headers: await _authHeaders());
     } catch (error) {
-      throw SessionSearchException('无法连接到仪表盘：$error');
+      throw SessionSearchException('Could not reach the dashboard: $error');
     }
 
     if (response.statusCode == 401 || response.statusCode == 403) {
       throw const SessionSearchException(
-        '仪表盘拒绝了已保存的凭据。请检查此连接的仪表盘用户名和密码。',
+        'The dashboard rejected the saved credentials. Check the dashboard '
+        'username and password for this connection.',
       );
     }
     if (response.statusCode == 404) {
       throw const SessionSearchException(
-        '此仪表盘不支持会话搜索。请更新主机上的 Hermes，或改回设备内搜索。',
+        'This dashboard does not expose session search. Update Hermes on the '
+        'host, or switch back to on-device search.',
       );
     }
     if (response.statusCode != 200) {
       throw SessionSearchException(
-        '会话搜索失败，HTTP ${response.statusCode}。',
+        'Session search failed with HTTP ${response.statusCode}.',
       );
     }
 
@@ -95,13 +97,13 @@ class SessionSearchClient {
       decoded = jsonDecode(body);
     } catch (_) {
       throw const SessionSearchException(
-        '仪表盘返回了格式错误的搜索响应。',
+        'The dashboard returned a malformed search response.',
       );
     }
 
     if (decoded is! Map<String, dynamic>) {
       throw const SessionSearchException(
-        '仪表盘返回了意外的搜索响应。',
+        'The dashboard returned an unexpected search response.',
       );
     }
 

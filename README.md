@@ -1,4 +1,4 @@
-# Hermes Android — v2.1.7
+# Hermes Android — v2.1.16
 
 Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — chat with your Hermes sessions from a phone or tablet over local Wi-Fi or a private Tailscale network.
 
@@ -14,7 +14,7 @@ Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — ch
 
 ## Current release
 
-- Version: **2.1.7** (build 2147)
+- Version: **2.1.16** (build 2156)
 - Package: `com.hermesagent.hermes_android`
 - Recommended APK for modern phones: ARM64 release build from the
   [Releases](https://github.com/rusty4444/hermes-android/releases) page.
@@ -54,9 +54,87 @@ while Android is backgrounded, the app re-syncs that session's server-side
 history on resume. The durable exactly-once recovery path activates only when a
 gateway explicitly advertises the compatible recovery contract.
 
-See [CHANGELOG.md](CHANGELOG.md) for the complete `.13` change list and
+See [CHANGELOG.md](CHANGELOG.md) for the complete `.16` change list and
 [docs/HERMESAPK_DEVELOPMENT_LOG.md](docs/HERMESAPK_DEVELOPMENT_LOG.md) for the
 sanitized implementation and validation record.
+
+## What's new in v2.1.16
+
+- **Correct Project labels in chat** — the sticky chat header now resolves its
+  authoritative server-side Project after opening, reconnecting, or binding a
+  new draft to its durable session, without delaying turn recovery.
+
+## What's new in v2.1.15
+
+- **Desktop-parity notifications** — receive configurable Android notifications
+  for completed and failed turns, approvals, clarifications, plugin events,
+  credit changes, and other background activity, then return safely to the
+  owning chat.
+- **Inline delivered files** — valid `MEDIA:` references become authenticated,
+  tappable file cards without turning streamed fragments or code examples into
+  downloads.
+- **Drafts survive navigation and restarts** — unsent composer text is kept per
+  saved connection and chat, while live session chips refresh only when their
+  pane is visible.
+
+## What's new in v2.1.14
+
+- **Navigation labels stay readable** — bottom-bar labels now fit on one line
+  on narrow phones at every supported text size and across every shipped
+  locale, with concise Russian bar labels that preserve the full pane titles.
+
+## What's new in v2.1.13
+
+- **Select exactly the text you need** — long-press any chat message to open a
+  selectable-text dialog, then copy part or all of the message. The dialog is
+  readable in light and dark themes and localised in all nine shipped languages.
+
+## What's new in v2.1.12
+
+- **Per-app language selection** — Android 13 and newer now list all nine
+  shipped Hermes locales in the system's app-language settings.
+- **Accurate idle sessions** — unended chats no longer remain permanently
+  active when the Gateway omits a liveness flag; Projects placeholders are
+  ignored and recent activity gets a bounded five-minute window.
+
+## What's new in v2.1.11
+
+- **Eight new languages** — the app is now localised in Japanese, Simplified
+  Chinese, Korean, Spanish, French, German, Brazilian Portuguese, and Russian.
+- **Reliable locale behaviour** — unsupported locales fall back to English,
+  Russian counts use the correct plural forms, and Chinese and Portuguese
+  region variants do not receive an incompatible catalogue.
+
+## What's new in v2.1.10
+
+- **Existing chats stay on target** — sending from a server-listed chat now
+  continues that exact session instead of creating a new sibling session.
+- **Single creation path for new chats** — local drafts use recovery v2 without
+  racing a second legacy session creation, while explicit fallback remains safe.
+
+## What's new in v2.1.9
+
+- **Interactive Gateway requests on Android** — clarification, approval, sudo,
+  and secret prompts now reach the phone during a running turn and recover
+  safely across reconnects.
+- **Fast, safe large-chat restore** — large sessions load a bounded recent
+  transcript without blocking the composer, then reconcile authoritative
+  history without losing newer turns.
+- **Accurate session status** — Android now uses the Gateway's explicit active
+  state instead of treating every unended session as still running.
+
+## What's new in v2.1.8
+
+v2.1.8 fixes two connection-lifecycle problems diagnosed and resolved by
+[@igitur](https://github.com/igitur) in PRs #111 and #113.
+
+- **Custom HTTPS ports work as entered** — an explicit Port field value is
+  honoured even when it is `8642`; leaving the field blank still infers `443`
+  for HTTPS and `8642` for HTTP.
+- **Turns survive leaving the chat** — navigating away during a running turn no
+  longer closes its SSE connection and interrupts the work server-side. The
+  detached client is released after completion, failure, cancellation, or its
+  safety timeout.
 
 ## What's new in v2.1.7
 
@@ -386,6 +464,8 @@ https://your-hermes-host.example.com
 
 If no port is included, the app uses port `443`. If your HTTPS service uses a custom port, either include it in the URL (`https://host.example.com:8443`) or set the Port field to that value before connecting.
 
+Leave the **Port** field blank and the app infers the scheme default — `443` for HTTPS, `8642` for HTTP. A value typed into **Port** is always used as-is, including `8642` over HTTPS (for example a `tailscale serve` endpoint that terminates TLS on the API-server port). A port inside the Host URL (`https://host.example.com:8443`) takes precedence over the Port field.
+
 For HTTPS connections, dashboard drawer screens use the same external HTTPS port. For local HTTP/LAN connections, chat uses port `8642` and dashboard screens use port `9119`.
 
 ### Reverse-proxy paths
@@ -530,7 +610,7 @@ cp build/app/outputs/flutter-apk/app-*-release.apk release-apks/
 block in `android/app/build.gradle.kts` derives per-ABI codes as
 `base * 10 + ABI code` (armeabi-v7a = 1, arm64-v8a = 2, x86_64 = 3), so the
 codes stay ordered armeabi-v7a < arm64-v8a < x86_64 as fdroiddata requires.
-For v2.1.7, base `2147` therefore produces codes `21471`/`21472`/`21473`.
+For v2.1.16, base `2156` therefore produces codes `21561`/`21562`/`21563`.
 CI reads the completed arm64 APK with `aapt` and fails if that relationship
 drifts. Release-floor checks continue to apply to the base value and must not
 be weakened to rely on the ABI code.
@@ -641,10 +721,24 @@ lib/
 
 ## Credits
 
+- **maebahesioru** — corrected Gateway session liveness handling with focused
+  regressions in PR #121 (v2.1.9), added complete Flutter localisation and
+  on-device Japanese QA in PR #115 (v2.1.11), then added Android per-app locale
+  support and the bounded idle-session fallback in PRs #125 and #123 (v2.1.12),
+  selectable message text with dark-theme and localisation coverage in PR #127
+  (v2.1.13), and accessible single-line navigation labels across every shipped
+  locale in PR #126 (v2.1.14), followed by desktop-parity notifications in PR
+  #128 and durable per-chat drafts with live status refresh in PR #131
+  (v2.1.15).
+- **igitur** — diagnosed and fixed explicit HTTPS port handling (PR #111) and
+  preserved running Hermes turns when leaving a chat (PR #113), with focused
+  regression coverage for both fixes. Released in v2.1.8.
 - **Thaeland** — contributed the extensive stock-gateway compatibility and
   reliability work in PR #106: durable reconnect recovery, Projects and Chats
   wire-contract fixes, safe pagination and folder ownership, transport
-  hardening, and the accompanying regression suite. Released in v2.1.7.
+  hardening, and the accompanying regression suite. Released in v2.1.7. They
+  later added secure inline `MEDIA:` delivery cards and the complete gateway
+  file-type contract in PR #137 (v2.1.15).
 - **spsDrop** — reported that Android could not connect through a private
   Caddy/Tailscale gateway whose CA was installed in the device trust store
   (#108). Fixed in v2.1.6.

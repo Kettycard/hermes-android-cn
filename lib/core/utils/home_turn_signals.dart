@@ -153,12 +153,12 @@ String? _attentionReason(GatewayTurnJournalEntry entry) {
   // A recovery failure outranks the reported status: the turn may well have
   // completed server-side, but the client could not reconcile it and the
   // composer stays blocked, which is exactly what Home must surface.
-  if (entry.failure != null) return '轮次恢复失败';
+  if (entry.failure != null) return 'Turn recovery failed';
   switch (entry.status) {
     case GatewayRecoveryTurnStatus.waitingInput:
-      return '等待你的输入';
+      return 'Waiting for your input';
     case GatewayRecoveryTurnStatus.failed:
-      return '上一个轮次失败';
+      return 'The last turn failed';
     case GatewayRecoveryTurnStatus.accepted:
     case GatewayRecoveryTurnStatus.running:
     case GatewayRecoveryTurnStatus.completed:

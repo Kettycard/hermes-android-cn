@@ -30,6 +30,7 @@ import '../utils/project_session_filter.dart';
 import '../utils/relative_time.dart';
 import 'hermes_components.dart';
 
+import 'package:hermes_android/core/l10n/l10n.dart';
 /// Reads one project's chats. Mirrors `ProjectsRepository.projectSessions` so
 /// the screen can be driven by a fake in tests without a gateway.
 typedef ProjectSessionsLoader =
@@ -151,21 +152,21 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(
                 HermesSpacing.lg,
                 HermesSpacing.lg,
                 HermesSpacing.lg,
                 HermesSpacing.sm,
               ),
-              child: Text('移动对话'),
+              child: Text(context.l10n.move_conversation),
             ),
             ListTile(
               leading: const Icon(Icons.inbox_outlined),
-              title: const Text('未分配'),
+              title: Text(context.l10n.unassigned),
               onTap: () => Navigator.pop(
                 context,
-                const _MoveTarget(projectId: null, label: '未分配'),
+                _MoveTarget(projectId: null, label: context.l10n.unassigned),
               ),
             ),
             for (final project in widget.projects)
@@ -195,7 +196,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         // files chats by folder and cannot un-file one). Report the real
         // reason instead of a generic failure with a doomed Retry.
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('无法移动到 ${target.label}：$reason')),
+          SnackBar(content: Text(context.l10n.couldn_t_move_to(target.label, reason))),
         );
         return;
       }
@@ -203,15 +204,15 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('已移动到 ${target.label}')));
+      ).showSnackBar(SnackBar(content: Text(context.l10n.moved_to(target.label))));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           persist: false,
-          content: const Text('无法移动对话'),
+          content: Text(context.l10n.couldn_t_move_conversation),
           action: SnackBarAction(
-            label: '重试',
+            label: context.l10n.retry,
             onPressed: () => _moveSession(session, target),
           ),
         ),
@@ -226,26 +227,26 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     final name = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('重命名 $_projectName'),
+        title: Text(context.l10n.rename_2(_projectName)),
         content: TextFormField(
           key: const Key('rename-project-name'),
           initialValue: _projectName,
           autofocus: true,
           maxLength: 80,
-          decoration: const InputDecoration(labelText: '名称'),
+          decoration: InputDecoration(labelText: context.l10n.name),
           onChanged: (value) => draft = value,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('取消'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
               final value = draft.trim();
               if (value.isNotEmpty) Navigator.pop(dialogContext, value);
             },
-            child: const Text('重命名'),
+            child: Text(context.l10n.rename),
           ),
         ],
       ),
@@ -263,7 +264,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     } catch (_) {
       if (!mounted) return;
       setState(() => _managing = false);
-      _showManagementError('重命名', _renameProject);
+      _showManagementError('rename', _renameProject);
     }
   }
 
@@ -271,18 +272,18 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('归档 $_projectName？'),
-        content: const Text(
-          '项目将移入“已归档”。其对话和文件保持不变，你可以稍后恢复。',
+        title: Text(context.l10n.archive_2(_projectName)),
+        content: Text(
+          context.l10n.the_project_will_move_to_archived_its_chats_and_files_2,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('取消'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('归档'),
+            child: Text(context.l10n.archive),
           ),
         ],
       ),
@@ -306,16 +307,23 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     } catch (_) {
       if (!mounted) return;
       setState(() => _managing = false);
-      _showManagementError('归档', _archiveProject);
+      _showManagementError('archive', _archiveProject);
     }
   }
 
   void _showManagementError(String action, Future<void> Function() retry) {
+    final actionLabel = switch (action) {
+      'create' => context.l10n.action_create,
+      'rename' => context.l10n.action_rename,
+      'archive' => context.l10n.action_archive,
+      'restore' => context.l10n.action_restore,
+      _ => action,
+    };
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         persist: false,
-        content: Text('无法$action项目'),
-        action: SnackBarAction(label: '重试', onPressed: retry),
+        content: Text(context.l10n.couldn_t_project(actionLabel)),
+        action: SnackBarAction(label: context.l10n.retry, onPressed: retry),
       ),
     );
   }
@@ -324,21 +332,21 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('删除 $_projectName？'),
-        content: const Text(
-          '这将永久删除该项目。对话不会被删除，它们将回到“未分配”。',
+        title: Text(context.l10n.delete_3(_projectName)),
+        content: Text(
+          context.l10n.this_permanently_deletes_the_project_chats_will_not_be_deleted,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('取消'),
+            child: Text(context.l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('删除'),
+            child: Text(context.l10n.delete),
           ),
         ],
       ),
@@ -368,9 +376,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           persist: false,
-          content: const Text('无法删除项目'),
+          content: Text(context.l10n.couldn_t_delete_project),
           action: SnackBarAction(
-            label: '重试',
+            label: context.l10n.retry,
             onPressed: () => _deleteProject(),
           ),
         ),
@@ -402,7 +410,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               )
             else
               PopupMenuButton<String>(
-                tooltip: '项目操作',
+                tooltip: context.l10n.project_actions,
                 onSelected: (action) {
                   switch (action) {
                     case 'rename':
@@ -415,14 +423,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                 },
                 itemBuilder: (context) => [
                   if (widget.onRenameProject != null)
-                    const PopupMenuItem<String>(
+                    PopupMenuItem<String>(
                       value: 'rename',
-                      child: Text('重命名项目'),
+                      child: Text(context.l10n.rename_project),
                     ),
                   if (widget.onArchiveProject != null)
-                    const PopupMenuItem<String>(
+                    PopupMenuItem<String>(
                       value: 'archive',
-                      child: Text('归档项目'),
+                      child: Text(context.l10n.archive_project),
                     ),
                   if (widget.onDeleteProject != null)
                     PopupMenuItem<String>(
@@ -435,7 +443,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                           ),
                           const SizedBox(width: HermesSpacing.sm),
                           Text(
-                            '删除项目',
+                            context.l10n.delete_project,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.error,
                             ),
@@ -448,12 +456,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         ],
         bottom: TabBar(
           controller: _tabs,
-          tabs: const [
-            Tab(text: '对话'),
-            Tab(text: '概览'),
-            Tab(text: '文件'),
-            Tab(text: '资产'),
-            Tab(text: '活动'),
+          tabs: [
+            Tab(text: context.l10n.chats),
+            Tab(text: context.l10n.overview),
+            Tab(text: context.l10n.files),
+            Tab(text: context.l10n.assets),
+            Tab(text: context.l10n.activity),
           ],
           isScrollable: true,
         ),
@@ -465,7 +473,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               key: kProjectNewChatButtonKey,
               onPressed: widget.onNewChat,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('新对话'),
+              label: Text(context.l10n.new_chat_2),
             ),
     );
   }
@@ -481,18 +489,19 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     // An older gateway is not a crash and not an empty project: saying "no
     // chats" here would state something this gateway cannot actually know.
     if (view.support == ProjectsSupport.unsupported) {
-      return const ErrorState.unsupported(
-        title: '项目对话暂不可用',
+      return ErrorState.unsupported(
+        title: context.l10n.project_chats_unavailable,
         message:
-            '此 Hermes 网关尚不支持打开项目。请在服务器上更新 Hermes，即可从手机浏览项目。',
+            context.l10n.this_hermes_gateway_does_not_support_opening_a_project_yet,
       );
     }
 
     // Only a *first* read with nothing to show is an error screen.
     if (view.error != null && view.sessions.isEmpty && !view.isStale) {
       return ErrorState(
-        title: '无法打开此项目',
-        message: '请确认网关正在运行且可访问，然后重试。',
+        title: context.l10n.could_not_open_this_project,
+        message:
+            context.l10n.check_that_the_gateway_is_running_and_reachable_then_try,
         onRetry: () => _load(refresh: true),
       );
     }
@@ -536,13 +545,13 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                   key: kProjectSearchFieldKey,
                   controller: _searchController,
                   onChanged: _onSearchChanged,
-                  hintText: '搜索对话',
+                  hintText: context.l10n.search_chats,
                   leading: const Icon(Icons.search),
                   trailing: [
                     if (querying)
                       IconButton(
                         icon: const Icon(Icons.close),
-                        tooltip: '清空搜索',
+                        tooltip: context.l10n.clear_search,
                         onPressed: () {
                           _searchController.clear();
                           _onSearchChanged('');
@@ -557,9 +566,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               hasScrollBody: false,
               child: EmptyState(
                 icon: Icons.forum_outlined,
-                title: '还没有对话',
+                title: context.l10n.no_chats_yet,
                 message:
-                    '你在此项目中开始的对话会显示在这里，并同步到登录此 Hermes 的所有设备。',
+                    context.l10n.chats_you_start_in_this_project_will_appear_here_on,
               ),
             )
           else if (filtered.isEmpty)
@@ -570,9 +579,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               hasScrollBody: false,
               child: EmptyState(
                 icon: Icons.search_off,
-                title: '没有匹配结果',
+                title: context.l10n.no_matches,
                 message:
-                    '此项目中没有对话匹配 “${_searchQuery.trim()}”。',
+                    context.l10n.no_chats_in_this_project_match(_searchQuery.trim()),
               ),
             )
           else
@@ -616,7 +625,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         padding: const EdgeInsets.only(bottom: HermesSpacing.xl),
         children: [
           if (view.isStale) const _OfflineNotice(),
-          const SectionHeader(title: '对话'),
+          SectionHeader(title: context.l10n.chats),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: HermesSpacing.lg),
             child: HermesCard(
@@ -626,7 +635,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                   const SizedBox(width: HermesSpacing.md),
                   Expanded(
                     child: Text(
-                      '此项目中的对话',
+                      context.l10n.conversations_in_this_project,
                       style: tokens.typography.body.copyWith(
                         color: tokens.onSurface,
                       ),
@@ -644,7 +653,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             ),
           ),
           if (tree != null && tree.repos.isNotEmpty) ...[
-            const SectionHeader(title: '仓库'),
+            SectionHeader(title: context.l10n.repositories),
             for (final repo in tree.repos)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -657,7 +666,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               ),
           ],
           if (tree?.path != null) ...[
-            const SectionHeader(title: '位置'),
+            SectionHeader(title: context.l10n.location),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: HermesSpacing.lg),
               child: HermesCard(
@@ -703,17 +712,17 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         children: [
           if (view.isStale) const _OfflineNotice(),
           if (paths.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: HermesSpacing.xl),
               child: EmptyState(
                 icon: Icons.folder_open_outlined,
-                title: '还没有文件夹',
+                title: context.l10n.no_folders_yet,
                 message:
-                    '服务器尚未报告此项目的文件夹。全局文件仍可从“更多”中访问。',
+                    context.l10n.the_server_has_not_reported_folders_for_this_project_yet,
               ),
             )
           else ...[
-            const SectionHeader(title: '文件夹'),
+            SectionHeader(title: context.l10n.folders),
             for (final path in paths)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -758,12 +767,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         padding: const EdgeInsets.only(bottom: HermesSpacing.xl),
         children: [
           if (view.isStale) const _OfflineNotice(),
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: HermesSpacing.xl),
             child: ErrorState.unsupported(
-              title: '资产暂不可用',
+              title: context.l10n.assets_unavailable,
               message:
-                  '资产需要 Hermes 网关提供服务器端权威的资产索引，才能按项目显示。',
+                  context.l10n.assets_need_a_server_authoritative_assets_index_in_the_hermes,
             ),
           ),
         ],
@@ -787,13 +796,13 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         children: [
           if (view.isStale) const _OfflineNotice(),
           if (sessions.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: HermesSpacing.xl),
               child: EmptyState(
                 icon: Icons.bolt_outlined,
-                title: '还没有活动',
+                title: context.l10n.no_activity_yet,
                 message:
-                    '此项目中的对话将在这里显示其状态和最近的活动时间。',
+                    context.l10n.chats_in_this_project_will_show_their_state_and_last,
               ),
             )
           else
@@ -815,7 +824,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                           children: [
                             Text(
                               session.title.trim().isEmpty
-                                  ? '未命名对话'
+                                  ? context.l10n.untitled_chat
                                   : session.title,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -834,7 +843,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                         status: session.isActive
                             ? HermesStatus.running
                             : HermesStatus.completed,
-                        label: session.isActive ? '运行中' : '已完成',
+                        label: session.isActive ? 'Running' : 'Done',
                       ),
                     ],
                   ),
@@ -867,7 +876,7 @@ class _OfflineNotice extends StatelessWidget {
           const SizedBox(width: HermesSpacing.sm),
           Expanded(
             child: Text(
-              '已离线 — 显示最近一次已知的对话',
+              context.l10n.offline_showing_the_last_known_chats,
               style: tokens.typography.label.copyWith(color: tokens.warning),
             ),
           ),
@@ -922,7 +931,7 @@ class _SessionCard extends StatelessWidget {
                 const SizedBox(width: HermesSpacing.xs),
                 IconButton(
                   key: Key('move-session-${session.id}'),
-                  tooltip: '移动对话',
+                  tooltip: context.l10n.move_conversation,
                   onPressed: onMove,
                   icon: const Icon(Icons.drive_file_move_outline, size: 20),
                 ),
@@ -986,7 +995,9 @@ class _RepoCard extends StatelessWidget {
               children: [
                 for (final lane in lanes)
                   Text(
-                    lane.isMain ? '${lane.label} · 主' : lane.label,
+                    lane.isMain
+                        ? context.l10n.branch_main(lane.label)
+                        : lane.label,
                     style: tokens.typography.label.copyWith(
                       color: lane.isMain ? tokens.accent : tokens.muted,
                     ),

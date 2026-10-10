@@ -6,6 +6,9 @@ import '../models/session.dart';
 import '../theme/hermes_theme.dart';
 import '../utils/relative_time.dart';
 import '../widgets/hermes_components.dart';
+import '../widgets/hermes_shell.dart';
+
+import 'package:hermes_android/core/l10n/l10n.dart';
 
 const kWorkspaceSessionSearchKey = Key('workspace-session-search');
 
@@ -14,24 +17,36 @@ enum WorkspaceSessionView { all, unassigned, archivedQuick, search }
 /// The chip filters the Chats browser offers (decision #4 of the final UI
 /// spec): every conversation, recent activity, unassigned, and archived.
 enum WorkspaceChatsFilter {
-  all('全部'),
-  recent('最近'),
-  unassigned('未分配'),
-  archived('已归档');
+  all,
+  recent,
+  unassigned,
+  archived;
 
-  final String label;
-  const WorkspaceChatsFilter(this.label);
+  String label(AppLocalizations l10n) {
+    return switch (this) {
+      WorkspaceChatsFilter.all => l10n.filter_all,
+      WorkspaceChatsFilter.recent => l10n.filter_recent,
+      WorkspaceChatsFilter.unassigned => l10n.unassigned,
+      WorkspaceChatsFilter.archived => l10n.archived,
+    };
+  }
 }
 
 /// How recently a conversation was last active, for date group headers.
 enum ChatDateBucket {
-  today('今天'),
-  yesterday('昨天'),
-  thisWeek('本周'),
-  earlier('更早');
+  today,
+  yesterday,
+  thisWeek,
+  earlier;
 
-  final String label;
-  const ChatDateBucket(this.label);
+  String label(AppLocalizations l10n) {
+    return switch (this) {
+      ChatDateBucket.today => l10n.date_today,
+      ChatDateBucket.yesterday => l10n.date_yesterday,
+      ChatDateBucket.thisWeek => l10n.this_week,
+      ChatDateBucket.earlier => l10n.date_earlier,
+    };
+  }
 }
 
 /// How long "Recent" means in the Chats browser.
@@ -241,6 +256,11 @@ class WorkspaceSessionsScreen extends StatefulWidget {
   /// screen uses `DateTime.now()`.
   final DateTime? now;
 
+  /// Periodic silent refresh for the running/idle chips. Null (the default,
+  /// used by tests that drive loads explicitly) disables the timer; the
+  /// production surfaces pass a modest interval.
+  final Duration? refreshInterval;
+
   const WorkspaceSessionsScreen({
     required this.title,
     required this.view,
@@ -249,6 +269,7 @@ class WorkspaceSessionsScreen extends StatefulWidget {
     this.onPromote,
     this.embedded = false,
     this.now,
+    this.refreshInterval,
     super.key,
   });
 
@@ -257,11 +278,22 @@ class WorkspaceSessionsScreen extends StatefulWidget {
       _WorkspaceSessionsScreenState();
 }
 
-class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
+class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen>
+    with WidgetsBindingObserver {
   WorkspaceSessionsData? _data;
   Object? _error;
   String _query = '';
   final Set<String> _promoting = {};
+
+  /// Periodic silent refresh so running/idle chips stay honest while the
+  /// list is actually visible (not behind a pushed chat, another shell tab,
+  /// or a backgrounded app).
+  Timer? _refreshTimer;
+  bool _visible = true;
+
+  /// Coalesces refresh ticks with manual pulls: a slow load must never
+  /// overlap the next tick (an older completion would win the setState).
+  bool _loadInFlight = false;
 
   /// The active chip filter in the embedded Chats browser.
   WorkspaceChatsFilter _filter = WorkspaceChatsFilter.all;
@@ -278,10 +310,55 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     unawaited(_load());
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncRefreshTimer();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _syncRefreshTimer();
+  }
+
+  /// True when this pane is on screen: the route is current (no chat pushed
+  /// over it), the shell tab is selected, and the app is foregrounded.
+  bool _computeVisible() {
+    if (!(ModalRoute.of(context)?.isCurrent ?? true)) return false;
+    if (!HermesPaneVisibility.of(context)) return false;
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    return lifecycle == null || lifecycle == AppLifecycleState.resumed;
+  }
+
+  /// Starts the periodic refresh only while visible: hidden panes must not
+  /// hit the gateway, and the pull-to-refresh keeps working regardless.
+  void _syncRefreshTimer() {
+    final visible = _computeVisible();
+    if (visible == _visible && _refreshTimer != null) return;
+    _visible = visible;
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+    final interval = widget.refreshInterval;
+    if (interval == null || !visible) return;
+    _refreshTimer = Timer.periodic(interval, (_) {
+      if (_visible) unawaited(_load());
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _load() async {
+    if (_loadInFlight) return;
+    _loadInFlight = true;
     try {
       final data = await widget.load();
       if (mounted) {
@@ -293,6 +370,8 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
     } catch (error) {
       debugPrint('[workspace-sessions] load failed: $error');
       if (mounted) setState(() => _error = error);
+    } finally {
+      _loadInFlight = false;
     }
   }
 
@@ -328,7 +407,7 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
       }
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('已移至项目')));
+      ).showSnackBar(SnackBar(content: Text(context.l10n.moved_to_a_project)));
     } catch (error) {
       if (!mounted) return;
       setState(() => _promoting.remove(session.id));
@@ -336,9 +415,9 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           persist: false,
-          content: const Text('无法提升对话'),
+          content: Text(context.l10n.couldn_t_promote_conversation),
           action: SnackBarAction(
-            label: '重试',
+            label: context.l10n.retry,
             onPressed: () => unawaited(_promote(session)),
           ),
         ),
@@ -356,8 +435,8 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
                   child: LoadingSkeleton(rows: 5),
                 )
               : ErrorState(
-                  title: '无法加载对话',
-                  message: '请检查连接后重试。',
+                  title: context.l10n.could_not_load_conversations,
+                  message: context.l10n.check_the_connection_and_try_again,
                   onRetry: _load,
                 )
         : _buildLoaded(data);
@@ -426,12 +505,12 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
             key: kWorkspaceSessionSearchKey,
             autofocus: widget.view == WorkspaceSessionView.search,
             decoration: InputDecoration(
-              hintText: '搜索对话',
+              hintText: context.l10n.search_conversations,
               prefixIcon: const Icon(Icons.search),
               suffixIcon: _query.isEmpty
                   ? null
                   : IconButton(
-                      tooltip: '清空搜索',
+                      tooltip: context.l10n.clear_search,
                       onPressed: () => setState(() => _query = ''),
                       icon: const Icon(Icons.clear),
                     ),
@@ -446,7 +525,9 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
           if (sessions.isEmpty)
             EmptyState(
               icon: _emptyIcon,
-              title: _query.isEmpty ? '这里还没有内容' : '无匹配',
+              title: _query.isEmpty
+                  ? context.l10n.nothing_here
+                  : context.l10n.no_matches,
               message: _emptyMessage,
             )
           else
@@ -457,7 +538,9 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
                   bottom: HermesSpacing.sm,
                 ),
                 child: Text(
-                  widget.embedded ? group.key.label : widget.title,
+                  widget.embedded
+                      ? group.key.label(context.l10n)
+                      : widget.title,
                   style: HermesTokens.of(context).typography.section,
                 ),
               ),
@@ -481,7 +564,7 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
             Padding(
               padding: const EdgeInsets.only(right: HermesSpacing.sm),
               child: ChoiceChip(
-                label: Text(filter.label),
+                label: Text(filter.label(context.l10n)),
                 selected: _filter == filter,
                 onSelected: (_) => setState(() {
                   _filter = filter;
@@ -522,7 +605,9 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  session.title.isEmpty ? '未命名对话' : session.title,
+                  session.title.isEmpty
+                      ? context.l10n.untitled_chat
+                      : session.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -543,7 +628,9 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
                       status: session.isActive
                           ? HermesStatus.running
                           : HermesStatus.completed,
-                      label: session.isActive ? '进行中' : '已完成',
+                      label: session.isActive
+                          ? context.l10n.status_running
+                          : context.l10n.status_done,
                     ),
                     if (projectLabel != null)
                       _MetaChip(
@@ -552,7 +639,7 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
                       )
                     else if (data.projectsKnown)
                       _MetaChip(
-                        label: '未分配',
+                        label: context.l10n.unassigned,
                         icon: Icons.inbox_outlined,
                       ),
                     Text(
@@ -574,8 +661,8 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
                   )
                 : IconButton(
                     tooltip: _isUnassignedSurface
-                        ? '移至项目'
-                        : '提升为项目',
+                        ? context.l10n.move_to_project
+                        : context.l10n.promote_to_project,
                     onPressed: () => unawaited(_promote(session)),
                     icon: const Icon(Icons.drive_file_move_outline),
                   ),
@@ -602,20 +689,22 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen> {
     if (widget.embedded) {
       return switch (_filter) {
         WorkspaceChatsFilter.unassigned =>
-          '所有对话都已分配到项目。',
-        WorkspaceChatsFilter.archived => '已归档的对话会显示在这里。',
+          context.l10n.every_conversation_is_already_assigned_to_a_project,
+        WorkspaceChatsFilter.archived =>
+          context.l10n.archived_conversations_appear_here,
         WorkspaceChatsFilter.recent =>
-          '最近七天没有变化。',
-        WorkspaceChatsFilter.all => '此视图没有匹配的对话。',
+          context.l10n.nothing_changed_in_the_last_seven_days,
+        WorkspaceChatsFilter.all =>
+          context.l10n.no_conversation_matches_this_view,
       };
     }
     return switch (widget.view) {
       WorkspaceSessionView.unassigned =>
-        '所有对话都已分配到项目。',
+        context.l10n.every_conversation_is_already_assigned_to_a_project,
       WorkspaceSessionView.archivedQuick =>
-        '快捷对话超过保留期后会显示在这里。',
-      WorkspaceSessionView.all ||
-      WorkspaceSessionView.search => '此视图没有匹配的对话。',
+        context.l10n.quick_chats_appear_here_after_their_retention_period,
+      WorkspaceSessionView.all || WorkspaceSessionView.search =>
+        context.l10n.no_conversation_matches_this_view,
     };
   }
 

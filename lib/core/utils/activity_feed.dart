@@ -33,6 +33,8 @@ import '../models/gateway_turn_contract.dart';
 import '../services/gateway_turn_journal.dart';
 import '../theme/hermes_theme.dart';
 
+import 'package:hermes_android/core/l10n/l10n.dart';
+
 /// How long a running turn may go without a journal update before Activity
 /// reports it as stalled instead of live.
 ///
@@ -61,16 +63,16 @@ enum ActivityGroupKind {
   /// Work that finished or was stopped by the user.
   completed;
 
-  String get title {
+  String title(AppLocalizations l10n) {
     switch (this) {
       case ActivityGroupKind.needsYou:
-        return '需要你处理';
+        return l10n.needs_you;
       case ActivityGroupKind.running:
-        return '正在运行';
+        return l10n.running_now;
       case ActivityGroupKind.failed:
-        return '失败';
+        return l10n.status_failed;
       case ActivityGroupKind.completed:
-        return '已完成';
+        return l10n.status_completed;
     }
   }
 }
@@ -126,7 +128,7 @@ class ActivityGroup {
     required this.totalCount,
   });
 
-  String get title => kind.title;
+  String title(AppLocalizations l10n) => kind.title(l10n);
 
   /// How many rows the cap hid.
   int get overflow => totalCount - items.length;
@@ -276,7 +278,7 @@ _Classification _classify(
   if (entry.failure != null) {
     return const _Classification(
       ActivityGroupKind.failed,
-      '轮次恢复失败',
+      'Turn recovery failed',
       HermesStatus.failed,
     );
   }
@@ -285,25 +287,25 @@ _Classification _classify(
     case GatewayRecoveryTurnStatus.waitingInput:
       return const _Classification(
         ActivityGroupKind.needsYou,
-        '等待你的输入',
+        'Waiting for your input',
         HermesStatus.blocked,
       );
     case GatewayRecoveryTurnStatus.failed:
       return const _Classification(
         ActivityGroupKind.failed,
-        '轮次失败',
+        'The turn failed',
         HermesStatus.failed,
       );
     case GatewayRecoveryTurnStatus.completed:
       return const _Classification(
         ActivityGroupKind.completed,
-        '已完成',
+        'Completed',
         HermesStatus.completed,
       );
     case GatewayRecoveryTurnStatus.interrupted:
       return const _Classification(
         ActivityGroupKind.completed,
-        '已停止',
+        'Stopped',
         HermesStatus.idle,
       );
     case null:
@@ -314,7 +316,7 @@ _Classification _classify(
       if (ageMs > staleMs) {
         return const _Classification(
           ActivityGroupKind.failed,
-          '已停滞 — Hermes 无更新',
+          'Stalled — no update from Hermes',
           HermesStatus.failed,
         );
       }
@@ -322,7 +324,7 @@ _Classification _classify(
       // but the gateway has not answered yet, so the work is outstanding.
       return _Classification(
         ActivityGroupKind.running,
-        entry.status == null ? '已提交，等待 Hermes' : '运行中',
+        entry.status == null ? 'Submitted, waiting for Hermes' : 'Running',
         HermesStatus.running,
       );
   }

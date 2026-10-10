@@ -4,6 +4,7 @@ import '../models/gateway_activity.dart';
 import '../theme/hermes_theme.dart';
 import 'hermes_components.dart';
 
+import 'package:hermes_android/core/l10n/l10n.dart';
 class GatewayActivityCard extends StatefulWidget {
   final List<GatewayToolActivity> activities;
   final bool verbose;
@@ -35,10 +36,12 @@ class _GatewayActivityCardState extends State<GatewayActivityCard> {
     final active = activities.any((activity) => !activity.isTerminal);
     final failures = activities.where((activity) => activity.isFailed).length;
     final subtitle = active
-        ? 'Hermes 正在使用${activities.length == 1 ? '一个工具' : '${activities.length} 个工具'}'
+        ? (activities.length == 1
+              ? context.l10n.hermes_is_using_a_tool
+              : context.l10n.hermes_is_using_tools(activities.length))
         : failures > 0
-        ? '$failures 个失败 • 共 ${activities.length} 个'
-        : '${activities.length} 个已完成';
+        ? context.l10n.activity_failed_summary(failures, activities.length)
+        : context.l10n.activity_completed_summary(activities.length);
 
     final cardStatus = active
         ? HermesStatus.running
@@ -78,7 +81,7 @@ class _GatewayActivityCardState extends State<GatewayActivityCard> {
                           ? Theme.of(context).colorScheme.error
                           : Theme.of(context).colorScheme.primary,
                     ),
-              title: const Text('工具活动'),
+              title: Text(context.l10n.tool_activity),
               subtitle: Text(subtitle),
               children: [
                 const Divider(height: 1),
@@ -108,7 +111,10 @@ class _GatewayActivityRow extends StatelessWidget {
         : Theme.of(context).colorScheme.secondary;
 
     return Semantics(
-      label: '${activity.displayName}: ${activity.statusLabel}',
+      label: context.l10n.activity_name_status(
+        activity.displayName,
+        activity.statusLabel,
+      ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
         child: Row(

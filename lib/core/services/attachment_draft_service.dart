@@ -92,7 +92,7 @@ class AttachmentDraftSendCoordinator {
         .toList(growable: false);
     if (refs.length != snapshot.length) {
       throw const AttachmentDraftException(
-        '提交提示词前，每个附件都必须已有网关引用。',
+        'Every attachment must have a gateway reference before prompt submit.',
       );
     }
     await submitPrompt(refs);
@@ -150,12 +150,12 @@ class AttachmentDraftService {
     final stat = await source.stat();
     if (stat.type != FileSystemEntityType.file || stat.size <= 0) {
       throw const AttachmentDraftException(
-        '所选图片为空或无法读取。',
+        'The selected image is empty or unreadable.',
       );
     }
     if (stat.size > maxRemoteAttachmentDraftBytes) {
       throw const AttachmentDraftException(
-        '所选图片超出了 64 MiB 的草稿配额。',
+        'The selected image exceeds the 64 MiB draft budget.',
       );
     }
     if (mode == AttachmentDraftMode.remoteGateway) {
@@ -171,14 +171,14 @@ class AttachmentDraftService {
       final format = _detectImageFormat(sourceBytes);
       if (format == null) {
         throw const AttachmentDraftException(
-          '不支持的图片格式。请选择 JPEG、PNG 或 WebP 图片。',
+          'Unsupported image format. Choose a JPEG, PNG, or WebP image.',
         );
       }
       decoded = image_lib.decodeImage(sourceBytes);
       sourceBytes = null;
       if (decoded == null) {
         throw const AttachmentDraftException(
-          '所选的 JPEG、PNG 或 WebP 图片无法安全解码。',
+          'The selected JPEG, PNG, or WebP image could not be decoded safely.',
         );
       }
 
@@ -199,7 +199,7 @@ class AttachmentDraftService {
       if (mode == AttachmentDraftMode.rest &&
           outputLength > maxRestImageBytes) {
         throw const AttachmentDraftException(
-          '净化后的图片过大，超出了旧版 REST 的限制。',
+          'The sanitized image is too large for the legacy REST limit.',
         );
       }
       if (mode == AttachmentDraftMode.remoteGateway) {
@@ -227,7 +227,7 @@ class AttachmentDraftService {
       rethrow;
     } catch (_) {
       throw const AttachmentDraftException(
-        '无法净化此图片。请选择有效的 JPEG、PNG 或 WebP 图片。',
+        'Unable to sanitize this image. Choose a valid JPEG, PNG, or WebP image.',
       );
     } finally {
       sourceBytes = null;
@@ -247,19 +247,19 @@ class AttachmentDraftService {
     _ensureRemoteSlot(existingDrafts);
     if (isSensitiveFileName(displayName)) {
       throw const AttachmentDraftException(
-        '此文件名可能包含凭据，已被阻止。',
+        'This filename is blocked because it may contain credentials.',
       );
     }
     final source = File(sourcePath);
     final stat = await source.stat();
     if (stat.type != FileSystemEntityType.file || stat.size <= 0) {
       throw const AttachmentDraftException(
-        '所选文件为空或无法读取。',
+        'The selected file is empty or unreadable.',
       );
     }
     if (stat.size > maxGenericAttachmentBytes) {
       throw const AttachmentDraftException(
-        '普通文件每个限制为 16 MiB。',
+        'Generic files are limited to 16 MiB each.',
       );
     }
     _ensureRemoteAggregate(existingDrafts, stat.size);
@@ -270,7 +270,7 @@ class AttachmentDraftService {
       final copiedSize = await destination.length();
       if (copiedSize != stat.size) {
         throw const AttachmentDraftException(
-          '所选文件未能完整复制。',
+          'The selected file could not be copied completely.',
         );
       }
       return AttachmentDraft(
@@ -291,25 +291,25 @@ class AttachmentDraftService {
     final snapshot = drafts.toList(growable: false);
     if (snapshot.length > maxRemoteAttachmentDrafts) {
       throw const AttachmentDraftException(
-        '一个远程网关草稿最多可附加 10 个项目。',
+        'You can attach up to 10 items to one Remote Gateway draft.',
       );
     }
     final total = snapshot.fold<int>(0, (sum, draft) => sum + draft.byteLength);
     if (total > maxRemoteAttachmentDraftBytes) {
       throw const AttachmentDraftException(
-        '每个草稿的附件总大小限制为 64 MiB。',
+        'Attachments are limited to 64 MiB total per draft.',
       );
     }
     for (final draft in snapshot) {
       if (draft.kind == AttachmentDraftKind.genericFile &&
           draft.byteLength > maxGenericAttachmentBytes) {
         throw const AttachmentDraftException(
-          '普通文件每个限制为 16 MiB。',
+          'Generic files are limited to 16 MiB each.',
         );
       }
       if (draft.isImage && !draft.sanitized) {
         throw const AttachmentDraftException(
-          '远程图片必须在上传前完成净化。',
+          'Remote images must be sanitized before upload.',
         );
       }
     }
@@ -320,12 +320,12 @@ class AttachmentDraftService {
     if (snapshot.length > 1 ||
         snapshot.any((draft) => !draft.isImage || !draft.sanitized)) {
       throw const AttachmentDraftException(
-        '旧版 REST 最多只接受一张净化后的图片。',
+        'Legacy REST accepts exactly one sanitized image at most.',
       );
     }
     if (snapshot.isNotEmpty && snapshot.single.byteLength > maxRestImageBytes) {
       throw const AttachmentDraftException(
-        '净化后的图片超出了旧版 REST 的限制。',
+        'The sanitized image exceeds the legacy REST limit.',
       );
     }
   }
@@ -393,7 +393,7 @@ class AttachmentDraftService {
   }) async {
     if (draft.status != AttachmentDraftStatus.failed) {
       throw const AttachmentDraftException(
-        '只能重试失败的附件。',
+        'Only a failed attachment can be retried.',
       );
     }
     return _uploadOne(draft, upload: upload, onChanged: onChanged);
@@ -468,7 +468,7 @@ class AttachmentDraftService {
   void _ensureRemoteSlot(Iterable<AttachmentDraft> drafts) {
     if (drafts.length >= maxRemoteAttachmentDrafts) {
       throw const AttachmentDraftException(
-        '一个远程网关草稿最多可附加 10 个项目。',
+        'You can attach up to 10 items to one Remote Gateway draft.',
       );
     }
   }
@@ -480,7 +480,7 @@ class AttachmentDraftService {
     final current = drafts.fold<int>(0, (sum, draft) => sum + draft.byteLength);
     if (current + candidateBytes > maxRemoteAttachmentDraftBytes) {
       throw const AttachmentDraftException(
-        '每个草稿的附件总大小限制为 64 MiB。',
+        'Attachments are limited to 64 MiB total per draft.',
       );
     }
   }

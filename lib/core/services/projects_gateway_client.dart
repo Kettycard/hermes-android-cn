@@ -257,7 +257,7 @@ class ProjectsGatewayClient {
       if (method == _probeMethod) _supported = false;
       throw ProjectsUnsupportedException(
         method,
-        '此网关不支持 $method',
+        'This gateway does not support $method',
       );
     }
     final Map<String, dynamic> response;

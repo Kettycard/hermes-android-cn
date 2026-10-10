@@ -4,53 +4,64 @@ import '../services/android_share_intent_service.dart';
 import '../theme/hermes_theme.dart';
 import '../utils/new_chat_options.dart';
 
+import 'package:hermes_android/core/l10n/l10n.dart';
 enum ShareFavoriteAction {
-  useAsIs('原样使用', Icons.edit_note_rounded),
-  summarize('总结', Icons.summarize_rounded),
-  explain('解释', Icons.lightbulb_outline_rounded),
-  research('深入研究', Icons.travel_explore_rounded),
-  extractTasks('提取任务', Icons.task_alt_rounded),
-  remember('记住', Icons.memory_rounded),
-  fillFromDocument('从文档填写', Icons.description_outlined);
+  useAsIs(Icons.edit_note_rounded),
+  summarize(Icons.summarize_rounded),
+  explain(Icons.lightbulb_outline_rounded),
+  research(Icons.travel_explore_rounded),
+  extractTasks(Icons.task_alt_rounded),
+  remember(Icons.memory_rounded),
+  fillFromDocument(Icons.description_outlined);
 
-  final String label;
   final IconData icon;
-  const ShareFavoriteAction(this.label, this.icon);
+  const ShareFavoriteAction(this.icon);
+
+  String label(AppLocalizations l10n) => switch (this) {
+    ShareFavoriteAction.useAsIs => l10n.use_as_is,
+    ShareFavoriteAction.summarize => l10n.share_action_summarize,
+    ShareFavoriteAction.explain => l10n.share_action_explain,
+    ShareFavoriteAction.research => l10n.share_action_research,
+    ShareFavoriteAction.extractTasks => l10n.extract_tasks,
+    ShareFavoriteAction.remember => l10n.share_action_remember,
+    ShareFavoriteAction.fillFromDocument => l10n.fill_from_document,
+  };
 }
 
 String buildSharedPrompt(
   ShareFavoriteAction action,
   String source, {
   bool hasAttachments = false,
+  required AppLocalizations l10n,
 }) {
   final text = source.trim();
   if (text.isEmpty && hasAttachments) {
     return switch (action) {
-      ShareFavoriteAction.useAsIs => '查看附带的内容。',
-      ShareFavoriteAction.summarize => '总结附带的内容。',
-      ShareFavoriteAction.explain => '清楚地解释附带的内容。',
+      ShareFavoriteAction.useAsIs => l10n.review_the_attached_content,
+      ShareFavoriteAction.summarize => l10n.summarize_the_attached_content,
+      ShareFavoriteAction.explain => l10n.explain_the_attached_content_clearly,
       ShareFavoriteAction.research =>
-        '研究附带的内容，核实重要论断，并注明来源。',
+        l10n.research_the_attached_content_verify_the_important_claims_and_cite,
       ShareFavoriteAction.extractTasks =>
-        '从附带的内容中提取决策、截止时间、负责人和可执行的行动项。',
+        l10n.extract_the_decisions_deadlines_owners_and_actionable_action_items_from,
       ShareFavoriteAction.remember =>
-        '把附带内容中持久有用的事实保存到记忆，然后确认保留了哪些内容。',
+        l10n.save_the_durable_facts_from_the_attached_content_to_memory,
       ShareFavoriteAction.fillFromDocument =>
-        '使用附带的内容识别并填写相关文档或表单字段。提交任何内容前请先询问。',
+        l10n.use_the_attached_content_to_identify_and_fill_the_relevant,
     };
   }
   return switch (action) {
     ShareFavoriteAction.useAsIs => text,
-    ShareFavoriteAction.summarize => '总结以下内容：\n\n$text',
-    ShareFavoriteAction.explain => '清楚地解释以下内容：\n\n$text',
+    ShareFavoriteAction.summarize => l10n.summarize_this_content(text),
+    ShareFavoriteAction.explain => l10n.explain_this_content_clearly(text),
     ShareFavoriteAction.research =>
-      '研究以下内容，核实重要论断，并注明来源：\n\n$text',
+      l10n.research_this_content_verify_the_important_claims_and_cite_sources(text),
     ShareFavoriteAction.extractTasks =>
-      '从以下内容中提取决策、截止时间、负责人和可执行的行动项：\n\n$text',
+      l10n.extract_the_decisions_deadlines_owners_and_actionable_action_items_from_2(text),
     ShareFavoriteAction.remember =>
-      '把以下内容中持久有用的事实保存到记忆，然后确认保留了哪些内容：\n\n$text',
+      l10n.save_the_durable_facts_from_this_content_to_memory_then(text),
     ShareFavoriteAction.fillFromDocument =>
-      '使用以下内容识别并填写相关文档或表单字段。提交任何内容前请先询问：\n\n$text',
+      l10n.use_this_content_to_identify_and_fill_the_relevant_document(text),
   };
 }
 
@@ -99,13 +110,13 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '分享到 Hermes',
+                      context.l10n.share_to_hermes,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: HermesSpacing.sm),
                     Text(
                       widget.sharedText.trim().isEmpty
-                          ? '没有分享文本'
+                          ? context.l10n.no_text_shared
                           : widget.sharedText,
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,
@@ -114,7 +125,7 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
                     if (widget.sharedFiles.isNotEmpty) ...[
                       const SizedBox(height: HermesSpacing.md),
                       Text(
-                        '${widget.sharedFiles.length} 个附件',
+                        context.l10n.attachment_count(widget.sharedFiles.length),
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       const SizedBox(height: HermesSpacing.xs),
@@ -137,7 +148,7 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
                     ],
                     const SizedBox(height: HermesSpacing.lg),
                     Text(
-                      '操作',
+                      context.l10n.action_label,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: HermesSpacing.sm),
@@ -148,7 +159,7 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
                         for (final action in ShareFavoriteAction.values)
                           ChoiceChip(
                             avatar: Icon(action.icon, size: 18),
-                            label: Text(action.label),
+                            label: Text(action.label(context.l10n)),
                             selected: _action == action,
                             onSelected: (_) => setState(() => _action = action),
                           ),
@@ -156,7 +167,7 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
                     ),
                     const SizedBox(height: HermesSpacing.lg),
                     Text(
-                      '目标',
+                      context.l10n.destination_label,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     RadioGroup<NewChatMode>(
@@ -166,19 +177,19 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
                       },
                       child: Column(
                         children: [
-                          const RadioListTile<NewChatMode>(
+                          RadioListTile<NewChatMode>(
                             contentPadding: EdgeInsets.zero,
-                            title: Text('快捷对话'),
-                            subtitle: Text('72 小时后自动归档'),
+                            title: Text(context.l10n.quick_chat),
+                            subtitle: Text(context.l10n.auto_archives_after_72_hours),
                             value: NewChatMode.quickChat,
                           ),
                           RadioListTile<NewChatMode>(
                             contentPadding: EdgeInsets.zero,
-                            title: const Text('项目对话'),
+                            title: Text(context.l10n.project_chat),
                             subtitle: Text(
                               widget.projectChatEnabled
-                                  ? '下一步选择一个活跃的项目'
-                                  : '此网关上没有活跃的项目',
+                                  ? context.l10n.choose_an_active_project_next
+                                  : context.l10n.no_active_projects_on_this_gateway,
                             ),
                             value: NewChatMode.projectChat,
                             enabled: widget.projectChatEnabled,
@@ -196,7 +207,7 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('取消'),
+                  child: Text(context.l10n.cancel),
                 ),
                 const SizedBox(width: HermesSpacing.sm),
                 FilledButton.icon(
@@ -204,7 +215,7 @@ class _ShareTextReviewSheetState extends State<ShareTextReviewSheet> {
                     context,
                   ).pop(ShareTextDecision(action: _action, mode: _mode)),
                   icon: const Icon(Icons.arrow_forward_rounded),
-                  label: const Text('继续'),
+                  label: Text(context.l10n.continue_label),
                 ),
               ],
             ),

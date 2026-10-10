@@ -1,3 +1,5 @@
+import 'package:hermes_android/l10n/app_localizations.dart';
+
 enum GatewaySensitivePromptKind { sudo, secret }
 
 /// A request-ID keyed password or secret prompt emitted by Hermes.
@@ -22,6 +24,7 @@ class GatewaySensitivePromptRequest {
   static GatewaySensitivePromptRequest? fromEventData({
     required GatewaySensitivePromptKind kind,
     required Map<String, dynamic> data,
+    AppLocalizations? l10n,
   }) {
     final requestId = data['request_id']?.toString().trim() ?? '';
     if (requestId.isEmpty) return null;
@@ -30,10 +33,11 @@ class GatewaySensitivePromptRequest {
       return GatewaySensitivePromptRequest(
         kind: kind,
         requestId: requestId,
-        title: '需要管理员密码',
+        title: l10n?.admin_password_needed ?? 'Administrator password needed',
         description:
-            'Hermes 需要待执行终端命令的 sudo 密码。',
-        fieldLabel: 'Sudo 密码',
+            l10n?.hermes_needs_a_sudo_password_for_the_pending_terminal_command ??
+            'Hermes needs a sudo password for the pending terminal command.',
+        fieldLabel: l10n?.sudo_password ?? 'Sudo password',
       );
     }
 
@@ -42,11 +46,14 @@ class GatewaySensitivePromptRequest {
     return GatewaySensitivePromptRequest(
       kind: kind,
       requestId: requestId,
-      title: envVar.isEmpty ? '需要机密值' : envVar,
+      title: envVar.isEmpty ? (l10n?.secret_needed ?? 'Secret needed') : envVar,
       description: prompt.isEmpty
-          ? 'Hermes 需要待执行技能的机密值。'
+          ? (l10n?.hermes_needs_a_secret_for_the_pending_skill ??
+                'Hermes needs a secret for the pending skill.')
           : prompt,
-      fieldLabel: envVar.isEmpty ? '机密值' : envVar,
+      fieldLabel: envVar.isEmpty
+          ? (l10n?.secret_value ?? 'Secret value')
+          : envVar,
     );
   }
 }

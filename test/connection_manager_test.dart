@@ -275,13 +275,46 @@ void main() {
     });
 
     test('normalizes HTTPS URLs without an explicit port to 443', () {
+      // null = the Port field was left blank, i.e. no port supplied.
+      final normalized = SavedConnection.normalizeHostAndPort(
+        'https://hermes.example.com',
+        null,
+      );
+
+      expect(normalized.host, 'hermes.example.com');
+      expect(normalized.port, 443);
+      expect(normalized.useHttps, isTrue);
+    });
+
+    test('honours an explicit 8642 on an HTTPS host instead of 443', () {
       final normalized = SavedConnection.normalizeHostAndPort(
         'https://hermes.example.com',
         8642,
       );
 
       expect(normalized.host, 'hermes.example.com');
-      expect(normalized.port, 443);
+      expect(normalized.port, 8642);
+      expect(normalized.useHttps, isTrue);
+    });
+
+    test('infers 8642 for HTTP when no port is supplied', () {
+      final normalized = SavedConnection.normalizeHostAndPort(
+        'hermes.example.com',
+        null,
+      );
+
+      expect(normalized.host, 'hermes.example.com');
+      expect(normalized.port, 8642);
+      expect(normalized.useHttps, isFalse);
+    });
+
+    test('a port inside the URL still wins over the Port field', () {
+      final normalized = SavedConnection.normalizeHostAndPort(
+        'https://hermes.example.com:9443',
+        8642,
+      );
+
+      expect(normalized.port, 9443);
       expect(normalized.useHttps, isTrue);
     });
 
@@ -1780,7 +1813,7 @@ void main() {
           id,
           'Moved',
           'https://hermes.example.com',
-          8642,
+          null,
           'new-key',
           gatewayPrefix: '',
           dashboardPrefix: '',
@@ -1802,6 +1835,49 @@ void main() {
         expect(conn.dashboardPortOverride, isNull);
         expect(conn.dashboardUsername, isNull);
         expect(conn.dashboardPassword, isNull);
+      },
+    );
+
+    test(
+      'saveConnection keeps an explicit 8642 for an HTTPS host (issue #110)',
+      () async {
+        final prefs = await SharedPreferences.getInstance();
+        final mgr = await ConnectionManager.create(
+          prefs,
+          credentialStore: _MemoryCredentialStore(),
+        );
+        await mgr.saveConnection(
+          'kodi',
+          'https://home-kodi.example.ts.net',
+          8642,
+          'key',
+        );
+
+        final conn = mgr.getConnections().single;
+        expect(conn.port, 8642);
+        expect(conn.useHttps, isTrue);
+        expect(conn.baseUrl, 'https://home-kodi.example.ts.net:8642');
+      },
+    );
+
+    test(
+      'saveConnection infers 443 for HTTPS when the Port field is blank',
+      () async {
+        final prefs = await SharedPreferences.getInstance();
+        final mgr = await ConnectionManager.create(
+          prefs,
+          credentialStore: _MemoryCredentialStore(),
+        );
+        await mgr.saveConnection(
+          'proxy',
+          'https://hermes.example.com',
+          null,
+          'key',
+        );
+
+        final conn = mgr.getConnections().single;
+        expect(conn.port, 443);
+        expect(conn.useHttps, isTrue);
       },
     );
   });
@@ -2008,6 +2084,9 @@ void main() {
           }
           expect(frames.first['params'], {
             'session_id': 'abc',
+            'omit_messages': true,
+            'defer_history': true,
+            'inline_images': false,
             'profile': 'sol',
           });
         } finally {
@@ -2840,7 +2919,12 @@ void main() {
         });
         final request = await requestSeen.future;
         expect(request['method'], 'session.resume');
-        expect(request['params'], {'session_id': 'stored-123'});
+        expect(request['params'], {
+          'session_id': 'stored-123',
+          'omit_messages': true,
+          'defer_history': true,
+          'inline_images': false,
+        });
       } finally {
         client.close();
         await socketSubscription.cancel();
@@ -3038,6 +3122,39 @@ void main() {
         expect(createCalls[1]['params'], isNot(contains('session_id')));
       });
 
+      test('a lazy stock-gateway submit publishes its durable binding before '
+          'the prompt completes', () async {
+        final client = buildClient();
+        addTearDown(client.close);
+        final bindings = <(String, String)>[];
+        client.setSessionBoundListener((localSessionId, storedSessionId) {
+          bindings.add((localSessionId, storedSessionId));
+        });
+
+        await client
+            .submitPrompt(
+              sessionId: 'mobile-draft',
+              text: 'Create the durable chat lazily',
+              onEvent: (_) {},
+              onSent: () {},
+            )
+            .then<void>((_) {}, onError: (_) {});
+
+        expect(bindings, [('mobile-draft', 'stored-project')]);
+        expect(client.storedSessionKeyFor('mobile-draft'), 'stored-project');
+        final methods = fixture.requests
+            .map((request) => request['method'])
+            .toList();
+        expect(
+          methods,
+          containsAllInOrder([
+            'session.resume',
+            'session.create',
+            'prompt.submit',
+          ]),
+        );
+      });
+
       test(
         'a reconnect after disconnect resumes the stored identity instead of '
         'creating a second session',
@@ -3089,8 +3206,18 @@ void main() {
             'cwd': '/srv/projects/hermes-android',
           });
           expect(resumeCalls, hasLength(2));
-          expect(resumeCalls.first['params'], {'session_id': 'mobile-project'});
-          expect(resumeCalls.last['params'], {'session_id': 'stored-project'});
+          expect(resumeCalls.first['params'], {
+            'session_id': 'mobile-project',
+            'omit_messages': true,
+            'defer_history': true,
+            'inline_images': false,
+          });
+          expect(resumeCalls.last['params'], {
+            'session_id': 'stored-project',
+            'omit_messages': true,
+            'defer_history': true,
+            'inline_images': false,
+          });
         },
       );
 
@@ -3356,6 +3483,7 @@ void main() {
         await client.connect();
         await client.respondToClarify(
           requestId: 'clarify-request-123',
+          questionId: 'q1',
           answer: 'Balanced',
         );
         final request = await requestSeen.future;
@@ -3363,6 +3491,7 @@ void main() {
         expect(request['method'], 'clarify.respond');
         expect(request['params'], {
           'request_id': 'clarify-request-123',
+          'question_id': 'q1',
           'answer': 'Balanced',
         });
       } finally {
@@ -3372,7 +3501,7 @@ void main() {
       }
     });
 
-    test('echoes question_id back for batch clarify answers', () async {
+    test('locks batch clarify answers with clarify.lock', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       final requestSeen = Completer<Map<String, dynamic>>();
       final socketSubscription = server
@@ -3398,10 +3527,11 @@ void main() {
           requestId: 'clarify-request-123',
           questionId: 'q1',
           answer: 'Balanced',
+          lockAnswer: true,
         );
         final request = await requestSeen.future;
 
-        expect(request['method'], 'clarify.respond');
+        expect(request['method'], 'clarify.lock');
         expect(request['params'], {
           'request_id': 'clarify-request-123',
           'question_id': 'q1',

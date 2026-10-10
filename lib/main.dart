@@ -4,16 +4,23 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/services/android_launch_intent_service.dart';
 import 'core/services/android_share_intent_service.dart';
+import 'core/services/composer_draft_store.dart';
 import 'core/services/config_backup.dart';
 import 'core/services/config_backup_io.dart';
 import 'core/services/config_backup_service.dart';
 import 'core/services/connection_manager.dart';
 import 'core/services/gateway_turn_application_controller.dart';
+import 'core/services/notification_prefs.dart';
 import 'core/services/text_size_preference.dart';
+import 'core/services/turn_notification_service.dart';
+import 'core/screens/chat_screen.dart';
 import 'core/screens/workspace_screen.dart';
 import 'core/theme/hermes_theme.dart';
 import 'core/utils/responsive.dart';
 import 'core/widgets/config_backup_card.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+import 'package:hermes_android/core/l10n/l10n.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,63 +77,75 @@ class _StartupRecoveryApp extends StatelessWidget {
     return MaterialApp(
       key: _rootKey,
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.storage_rounded, size: 48),
-                const SizedBox(height: 16),
-                const Text(
-                  'Hermes 无法加载已保存的连接',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '本地连接存储似乎已损坏 '
-                  '(${error.runtimeType})。你可以重置已保存的'
-                  '连接并重新开始。网关上的对话不受影响。',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13),
-                ),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: () async {
-                    await prefs.remove('saved_connections');
-                    try {
-                      final retry = await ConnectionManager.create(prefs);
-                      runApp(
-                        HermesApp(
-                          connManager: retry,
-                          shareIntents: shareIntents,
-                          launchIntents: launchIntents,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: preferredSupportedLocales(),
+      localeListResolutionCallback: resolvePreferredLocale,
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.storage_rounded, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    context.l10n.hermes_could_not_load_your_saved_connections,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    context.l10n
+                        .the_local_connection_store_looks_damaged_you_can_reset_the(
+                          error.runtimeType,
                         ),
-                      );
-                    } catch (retryError) {
-                      // Re-read the key after the await: the recovery
-                      // screen may already have been replaced by the
-                      // retried app.
-                      final context = _rootKey.currentContext;
-                      if (context != null) {
-                        // ignore: use_build_context_synchronously
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '重置失败：$retryError。安全存储'
-                              '可能需要重新安装。',
-                            ),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: () async {
+                      await prefs.remove('saved_connections');
+                      try {
+                        final retry = await ConnectionManager.create(prefs);
+                        runApp(
+                          HermesApp(
+                            connManager: retry,
+                            shareIntents: shareIntents,
+                            launchIntents: launchIntents,
                           ),
                         );
+                      } catch (retryError) {
+                        // Re-read the key after the await: the recovery
+                        // screen may already have been replaced by the
+                        // retried app.
+                        final rootContext = _rootKey.currentContext;
+                        if (rootContext != null) {
+                          // The context is re-read from the root key after
+                          // the await and null-checked immediately above.
+                          // ignore: use_build_context_synchronously
+                          ScaffoldMessenger.of(rootContext).showSnackBar(
+                            SnackBar(
+                              content: Builder(
+                                builder: (snackContext) => Text(
+                                  snackContext.l10n
+                                      .reset_failed_the_secure_storage_may_need_reinstall(
+                                        retryError,
+                                      ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }
                       }
-                    }
-                  },
-                  icon: const Icon(Icons.restart_alt),
-                  label: const Text('重置已保存的连接'),
-                ),
-              ],
+                    },
+                    icon: const Icon(Icons.restart_alt),
+                    label: Text(context.l10n.reset_saved_connections),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -181,10 +200,152 @@ class HermesApp extends StatefulWidget {
 class HermesAppState extends State<HermesApp> {
   late final GatewayTurnApplicationController _turnApplicationController;
 
+  /// Pushes from the app root (notification taps) need a navigator below the
+  /// MaterialApp this state builds.
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   void initState() {
     super.initState();
     _turnApplicationController = GatewayTurnApplicationController();
+    unawaited(NotificationPrefsStore.load());
+    notificationResponseHandler = _handleNotificationResponse;
+    // A notification that launched a terminated app carries its tap/action in
+    // the platform's launch details; route it once the first frame is up.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final initial = await TurnNotificationService.shared
+          .takeInitialNotificationResponse();
+      if (initial != null && mounted) _handleNotificationResponse(initial);
+    });
+  }
+
+  /// The connection a notification response should act on: the last one the
+  /// user opened, or the only configured one.
+  SavedConnection? _notificationConnection() {
+    final connections = widget.connManager.getConnections();
+    final lastId = widget.connManager.prefs.getString(
+      HomeScreenState._lastConnectionKey,
+    );
+    final preferred = connections
+        .where((connection) => connection.id == lastId)
+        .firstOrNull;
+    return preferred ?? (connections.length == 1 ? connections.single : null);
+  }
+
+  /// Routes a notification tap (or one of its action buttons) into the app.
+  ///
+  /// Approval actions answer through the turn controller when it owns the
+  /// request; otherwise the action is left pending for the chat that does, and
+  /// every response lands the user on the session the notification was about.
+  void _handleNotificationResponse(NotificationResponse response) {
+    final route = NotificationRoute.fromResponse(response);
+    // An explicit connection id must resolve: falling back to another backend
+    // could answer an approval against the wrong gateway. Only legacy
+    // payloads without an id use the last-opened connection.
+    final hasExplicitConnection =
+        route.connectionId != null && route.connectionId!.isNotEmpty;
+    final connection = hasExplicitConnection
+        ? _connectionById(route.connectionId)
+        : _notificationConnection();
+    if (connection == null) return;
+
+    final choice = route.approvalChoice;
+    final sessionId = route.sessionId;
+    final requestId = route.requestId;
+    if (choice != null && sessionId != null && requestId != null) {
+      final approval = PendingNotificationApproval(
+        // Saved connection ids remain distinct even when two profiles point
+        // at the same endpoint with different credentials or gateway profiles.
+        connectionId: connection.id,
+        sessionId: sessionId,
+        requestId: requestId,
+        choice: choice,
+      );
+      try {
+        final session = _turnApplicationController.sessionFor(connection);
+        unawaited(
+          session
+              .tryRespondToApproval(
+                sessionId: sessionId,
+                choice: choice,
+                requestId: requestId,
+              )
+              .then((answered) {
+                // The request belongs to an open chat's route-local gateway:
+                // leave it pending so that screen answers it normally.
+                if (!answered) addPendingNotificationApproval(approval);
+              })
+              .catchError((_) {
+                // A throw is unresolved, not answered: keep the tap pending
+                // so the owning chat can still answer it.
+                addPendingNotificationApproval(approval);
+              }),
+        );
+      } catch (_) {
+        // A closed controller cannot answer; the owning chat still can.
+        addPendingNotificationApproval(approval);
+      }
+    }
+
+    unawaited(_openNotificationSession(connection, sessionId));
+  }
+
+  /// The connection a payload names, or null when it no longer exists.
+  SavedConnection? _connectionById(String? id) {
+    if (id == null || id.isEmpty) return null;
+    return widget.connManager
+        .getConnections()
+        .where((connection) => connection.id == id)
+        .firstOrNull;
+  }
+
+  /// Opens the chat a notification was about; falls back to the workspace when
+  /// the session cannot be fetched (deleted, or outside the recent list).
+  Future<void> _openNotificationSession(
+    SavedConnection connection,
+    String? sessionId,
+  ) async {
+    Session? session;
+    if (sessionId != null && sessionId.isNotEmpty) {
+      ApiClient? client;
+      try {
+        client = ApiClient(
+          baseUrl: connection.baseUrl,
+          apiKey: connection.apiKey,
+          pathPrefix: connection.gatewayPrefix ?? '',
+        );
+        session = await client.getSessionById(sessionId);
+      } catch (_) {
+        session = null;
+      } finally {
+        client?.close();
+      }
+    }
+    if (!mounted) return;
+    widget.connManager.prefs.setString(
+      HomeScreenState._lastConnectionKey,
+      connection.id,
+    );
+    if (session == null) {
+      _navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => WorkspaceScreen(
+            connection: connection,
+            turnApplicationController: _turnApplicationController,
+          ),
+        ),
+      );
+      return;
+    }
+    _navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          connection: connection,
+          session: session!,
+          turnApplicationController: _turnApplicationController,
+        ),
+      ),
+    );
   }
 
   Future<void> setTextSizePreference(TextSizePreference preference) async {
@@ -195,7 +356,11 @@ class HermesAppState extends State<HermesApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Hermes 智能体',
+      navigatorKey: _navigatorKey,
+      onGenerateTitle: (context) => context.l10n.hermes_agent,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: preferredSupportedLocales(),
+      localeListResolutionCallback: resolvePreferredLocale,
       themeMode: HermesApp.getThemeMode(widget.connManager.prefs),
       theme: hermesTheme(Brightness.light),
       darkTheme: hermesTheme(Brightness.dark),
@@ -353,7 +518,7 @@ class HomeScreenState extends State<HomeScreen> {
   void _showRestoreError(Object error) {
     final message = error is ConfigBackupException
         ? error.message
-        : '无法恢复备份。';
+        : context.l10n.the_backup_could_not_be_restored;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
@@ -456,6 +621,7 @@ class HomeScreenState extends State<HomeScreen> {
           turnApplicationController: widget.turnApplicationController,
           initialSharedPayload: sharedPayload,
           initialQuickChat: initialQuickChat,
+          sessionsRefreshInterval: const Duration(seconds: 10),
         ),
       ),
     );
@@ -534,7 +700,7 @@ class HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('更新 API 密钥'),
+          title: Text(context.l10n.update_api_key),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -572,9 +738,9 @@ class HomeScreenState extends State<HomeScreen> {
                 ),
               TextField(
                 controller: ctrl,
-                decoration: const InputDecoration(
-                  labelText: 'API 密钥',
-                  hintText: '来自 ~/.hermes/.env 的 API_SERVER_KEY',
+                decoration: InputDecoration(
+                  labelText: context.l10n.api_key,
+                  hintText: context.l10n.api_server_key_from_hermes_env,
                 ),
                 obscureText: true,
                 enabled: !validating,
@@ -584,7 +750,7 @@ class HomeScreenState extends State<HomeScreen> {
           actions: [
             TextButton(
               onPressed: validating ? null : () => Navigator.pop(ctx),
-              child: const Text('取消'),
+              child: Text(context.l10n.cancel),
             ),
             FilledButton(
               onPressed: validating
@@ -623,13 +789,18 @@ class HomeScreenState extends State<HomeScreen> {
                       } on CredentialStorageException {
                         if (!ctx.mounted) return;
                         setDialogState(() {
-                          error = '无法安全地保存 API 密钥。';
+                          error = context
+                              .l10n
+                              .the_api_key_could_not_be_stored_securely;
                           validating = false;
                         });
                       } catch (_) {
                         if (!ctx.mounted) return;
                         setDialogState(() {
-                          error = '无法连接到 ${conn.host}:${conn.port}。';
+                          error = context.l10n.cannot_reach(
+                            conn.host,
+                            conn.port,
+                          );
                           validating = false;
                         });
                       }
@@ -643,7 +814,7 @@ class HomeScreenState extends State<HomeScreen> {
                         color: Colors.white,
                       ),
                     )
-                  : const Text('保存'),
+                  : Text(context.l10n.save),
             ),
           ],
         ),
@@ -671,7 +842,7 @@ class HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('仪表盘 / 代理设置'),
+          title: Text(context.l10n.dashboard_proxy_settings),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -679,9 +850,9 @@ class HomeScreenState extends State<HomeScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
-                    '用于托管路径前缀，以及设置、记忆、技能和定时任务标签页。'
-                    '开放仪表盘可将用户名/密码留空；若反向代理已注入仪表盘认证，'
-                    '请启用代理模式。',
+                    context
+                        .l10n
+                        .used_for_hosted_path_prefixes_and_for_the_settings_memory,
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                 ),
@@ -719,9 +890,9 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                 TextField(
                   controller: gatewayPrefixCtrl,
-                  decoration: const InputDecoration(
-                    labelText: '网关路径前缀',
-                    hintText: '例如 /profile/peter',
+                  decoration: InputDecoration(
+                    labelText: context.l10n.gateway_path_prefix,
+                    hintText: context.l10n.e_g_profile_peter,
                   ),
                   autocorrect: false,
                   enabled: !validating,
@@ -729,9 +900,9 @@ class HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: dashboardPrefixCtrl,
-                  decoration: const InputDecoration(
-                    labelText: '仪表盘路径前缀',
-                    hintText: '例如 /dashboard',
+                  decoration: InputDecoration(
+                    labelText: context.l10n.dashboard_path_prefix,
+                    hintText: context.l10n.e_g_dashboard,
                   ),
                   autocorrect: false,
                   enabled: !validating,
@@ -740,9 +911,9 @@ class HomeScreenState extends State<HomeScreen> {
                 SwitchListTile(
                   value: proxied,
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('仪表盘位于代理之后'),
-                  subtitle: const Text(
-                    '由代理注入认证，应用发送干净请求',
+                  title: Text(context.l10n.dashboard_behind_proxy),
+                  subtitle: Text(
+                    context.l10n.proxy_injects_auth_app_sends_clean_requests,
                   ),
                   onChanged: validating
                       ? null
@@ -751,9 +922,9 @@ class HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: portCtrl,
-                  decoration: const InputDecoration(
-                    labelText: '仪表盘端口',
-                    hintText: '留空使用默认端口 (9119)',
+                  decoration: InputDecoration(
+                    labelText: context.l10n.dashboard_port,
+                    hintText: context.l10n.leave_blank_for_default_9119,
                   ),
                   keyboardType: TextInputType.number,
                   enabled: !validating,
@@ -761,8 +932,8 @@ class HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: userCtrl,
-                  decoration: const InputDecoration(
-                    labelText: '用户名（可选）',
+                  decoration: InputDecoration(
+                    labelText: context.l10n.username_optional,
                   ),
                   autocorrect: false,
                   enabled: !validating,
@@ -770,8 +941,8 @@ class HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: passCtrl,
-                  decoration: const InputDecoration(
-                    labelText: '密码（可选）',
+                  decoration: InputDecoration(
+                    labelText: context.l10n.password_optional,
                   ),
                   obscureText: true,
                   enabled: !validating,
@@ -782,7 +953,7 @@ class HomeScreenState extends State<HomeScreen> {
           actions: [
             TextButton(
               onPressed: validating ? null : () => Navigator.pop(ctx),
-              child: const Text('取消'),
+              child: Text(context.l10n.cancel),
             ),
             FilledButton(
               onPressed: validating
@@ -793,7 +964,9 @@ class HomeScreenState extends State<HomeScreen> {
                           ? null
                           : int.tryParse(portText);
                       if (portText.isNotEmpty && (port == null || port <= 0)) {
-                        setDialogState(() => error = '端口号无效。');
+                        setDialogState(
+                          () => error = context.l10n.invalid_port_number,
+                        );
                         return;
                       }
                       final user = userCtrl.text.trim();
@@ -854,17 +1027,20 @@ class HomeScreenState extends State<HomeScreen> {
                         client.close();
                         if (!ctx.mounted) return;
                         setDialogState(() {
-                          error =
-                              '无法安全地保存仪表盘凭据。';
+                          error = context
+                              .l10n
+                              .the_dashboard_credentials_could_not_be_stored_securely;
                           validating = false;
                         });
                       } catch (_) {
                         client.close();
                         if (!ctx.mounted) return;
                         setDialogState(() {
-                          error =
-                              '无法连接或认证 ${conn.host}:${port ?? conn.dashboardPort} '
-                              '的仪表盘。请检查端口和凭据。';
+                          error = context.l10n
+                              .could_not_reach_authenticate_the_dashboard_at_check_the_port(
+                                port ?? conn.dashboardPort,
+                                conn.host,
+                              );
                           validating = false;
                         });
                       }
@@ -878,7 +1054,7 @@ class HomeScreenState extends State<HomeScreen> {
                         color: Colors.white,
                       ),
                     )
-                  : const Text('保存'),
+                  : Text(context.l10n.save),
             ),
           ],
         ),
@@ -899,8 +1075,10 @@ class HomeScreenState extends State<HomeScreen> {
         leading: const Icon(Icons.router, color: Color(0xFFD4AF37)),
         title: Text(conn.label),
         subtitle: Text(
-          '${conn.host}:${conn.port}${conn.gatewayPrefix != null && conn.gatewayPrefix!.isNotEmpty ? conn.gatewayPrefix! : ''}'
-          '  \u2022  密钥: ${conn.apiKey.isNotEmpty ? "\u2713" : "\u2717"}',
+          context.l10n.connection_address_key(
+            '${conn.host}:${conn.port}${conn.gatewayPrefix != null && conn.gatewayPrefix!.isNotEmpty ? conn.gatewayPrefix! : ''}',
+            conn.apiKey.isNotEmpty ? "\u2713" : "\u2717",
+          ),
           style: TextStyle(color: Colors.grey[600]),
         ),
         trailing: PopupMenuButton<String>(
@@ -908,13 +1086,16 @@ class HomeScreenState extends State<HomeScreen> {
             if (v == 'delete') {
               try {
                 await widget.connManager.deleteConnection(conn.id);
+                // Drop every draft stored for this connection: a deleted
+                // connection must not leave orphaned drafts behind.
+                await ComposerDraftStore.removeConnection(conn.id);
                 if (mounted) _refresh();
               } on CredentialStorageException {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
+                  SnackBar(
                     content: Text(
-                      '无法安全地删除该连接。',
+                      context.l10n.the_connection_could_not_be_deleted_safely,
                     ),
                   ),
                 );
@@ -928,15 +1109,24 @@ class HomeScreenState extends State<HomeScreen> {
             }
           },
           itemBuilder: (_) => [
-            const PopupMenuItem(value: 'edit', child: Text('编辑连接')),
-            const PopupMenuItem(value: 'apikey', child: Text('更新 API 密钥')),
-            const PopupMenuItem(
-              value: 'dashboard',
-              child: Text('仪表盘 / 代理设置'),
+            PopupMenuItem(
+              value: 'edit',
+              child: Text(context.l10n.edit_connection),
             ),
-            const PopupMenuItem(
+            PopupMenuItem(
+              value: 'apikey',
+              child: Text(context.l10n.update_api_key),
+            ),
+            PopupMenuItem(
+              value: 'dashboard',
+              child: Text(context.l10n.dashboard_proxy_settings),
+            ),
+            PopupMenuItem(
               value: 'delete',
-              child: Text('删除', style: TextStyle(color: Colors.red)),
+              child: Text(
+                context.l10n.delete,
+                style: TextStyle(color: Colors.red),
+              ),
             ),
           ],
         ),
@@ -963,7 +1153,7 @@ class HomeScreenState extends State<HomeScreen> {
           if (_connections.isNotEmpty)
             IconButton(
               key: const Key('home_restore_config_menu'),
-              tooltip: '恢复配置',
+              tooltip: context.l10n.restore_configuration,
               onPressed: _showRestoreConfig,
               icon: const Icon(Icons.settings_backup_restore),
             ),
@@ -977,12 +1167,14 @@ class HomeScreenState extends State<HomeScreen> {
                   Icon(Icons.cloud_outlined, size: 64, color: Colors.grey[800]),
                   const SizedBox(height: 16),
                   Text(
-                    '暂无连接',
+                    context.l10n.no_connections,
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '点击 + 添加远程 Hermes 网关\n（API Server，端口 8642）',
+                    context
+                        .l10n
+                        .tap_to_add_a_remote_hermes_gateway_api_server_port,
                     style: Theme.of(
                       context,
                     ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
@@ -993,7 +1185,7 @@ class HomeScreenState extends State<HomeScreen> {
                     key: const Key('home_restore_config_button'),
                     onPressed: _showRestoreConfig,
                     icon: const Icon(Icons.settings_backup_restore),
-                    label: const Text('恢复配置'),
+                    label: Text(context.l10n.restore_configuration),
                   ),
                 ],
               ),
@@ -1021,7 +1213,7 @@ class HomeScreenState extends State<HomeScreen> {
               },
             ),
       floatingActionButton: FloatingActionButton(
-        tooltip: '添加连接',
+        tooltip: context.l10n.add_connection,
         onPressed: _showAddDialog,
         child: const Icon(Icons.add, color: Colors.black),
       ),
@@ -1034,7 +1226,7 @@ class _AddDialog extends StatefulWidget {
   final Future<void> Function(
     String label,
     String host,
-    int port,
+    int? port,
     String apiKey, {
     String? gatewayPrefix,
     String? dashboardPrefix,
@@ -1075,7 +1267,7 @@ class _AddDialogState extends State<_AddDialog> {
   void initState() {
     super.initState();
     final conn = widget.initialConnection;
-    _label = TextEditingController(text: conn?.label ?? '主页');
+    _label = TextEditingController(text: conn?.label ?? 'Home');
     _host = TextEditingController(
       text: conn == null
           ? ''
@@ -1083,7 +1275,7 @@ class _AddDialogState extends State<_AddDialog> {
           ? 'https://${conn.host}'
           : conn.host,
     );
-    _port = TextEditingController(text: (conn?.port ?? 8642).toString());
+    _port = TextEditingController(text: conn?.port.toString() ?? '');
     _apiKey = TextEditingController(text: conn?.apiKey ?? '');
     _gatewayPrefix = TextEditingController(text: conn?.gatewayPrefix ?? '');
     _dashboardPrefix = TextEditingController(text: conn?.dashboardPrefix ?? '');
@@ -1116,12 +1308,14 @@ class _AddDialogState extends State<_AddDialog> {
   Future<void> _validateAndSave() async {
     final label = _label.text.trim();
     final host = _host.text.trim();
-    final port = int.tryParse(_port.text.trim()) ?? 8642;
+    final port = int.tryParse(_port.text.trim());
     final apiKey = _apiKey.text.trim();
     final gatewayPrefix = _gatewayPrefix.text.trim();
     final dashboardPrefix = _dashboardPrefix.text.trim();
 
-    if (label.isEmpty || host.isEmpty || port <= 0) return;
+    // A blank Port field means "not supplied": normalizeHostAndPort then infers
+    // 8642 for HTTP and 443 for HTTPS.
+    if (label.isEmpty || host.isEmpty || (port != null && port <= 0)) return;
 
     setState(() {
       _validating = true;
@@ -1165,8 +1359,7 @@ class _AddDialogState extends State<_AddDialog> {
           gatewayProfile.contains(RegExp(r'\s'))) {
         setState(() {
           _error =
-              'Hermes profile must be a plain profile name such as "sol", '
-              'not a path.';
+              context.l10n.hermes_profile_must_be_a_plain_profile_name_such_as;
           _validating = false;
           _showDashboard = true;
         });
@@ -1205,9 +1398,9 @@ class _AddDialogState extends State<_AddDialog> {
           dashClient.close();
           if (!mounted) return;
           setState(() {
-            _error =
-                '网关已连接，但无法访问或认证仪表盘。'
-                '请检查仪表盘信息，或清空这些信息以跳过。';
+            _error = context
+                .l10n
+                .gateway_connected_but_the_dashboard_could_not_be_reached_or;
             _validating = false;
             _showDashboard = true;
           });
@@ -1235,13 +1428,16 @@ class _AddDialogState extends State<_AddDialog> {
     } on CredentialStorageException {
       if (!mounted) return;
       setState(() {
-        _error = '无法安全地保存该连接。';
+        _error = context.l10n.the_connection_could_not_be_stored_securely;
         _validating = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = '无法连接到 $host:$port。请检查主机和端口。';
+        _error = context.l10n.cannot_reach_check_the_host_and_port(
+          host,
+          port ?? '',
+        );
         _validating = false;
       });
     }
@@ -1251,7 +1447,9 @@ class _AddDialogState extends State<_AddDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(
-        _isEditing ? '编辑网关连接' : '添加网关连接',
+        _isEditing
+            ? context.l10n.edit_gateway_connection
+            : context.l10n.add_gateway_connection,
       ),
       content: SingleChildScrollView(
         child: Column(
@@ -1287,15 +1485,15 @@ class _AddDialogState extends State<_AddDialog> {
             ],
             TextField(
               controller: _label,
-              decoration: const InputDecoration(labelText: '标签'),
+              decoration: InputDecoration(labelText: context.l10n.label),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _host,
-              decoration: const InputDecoration(
-                labelText: '主机',
+              decoration: InputDecoration(
+                labelText: context.l10n.host,
                 hintText:
-                    '192.168.1.50、100.x.y.z 或 hermes-machine.tailnet.ts.net',
+                    '192.168.1.50, 100.x.y.z, or hermes-machine.tailnet.ts.net',
               ),
               keyboardType: TextInputType.text,
               autocorrect: false,
@@ -1303,18 +1501,19 @@ class _AddDialogState extends State<_AddDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _port,
-              decoration: const InputDecoration(
-                labelText: '端口',
-                hintText: '8642（API Server）',
+              decoration: InputDecoration(
+                labelText: context.l10n.port,
+                hintText:
+                    context.l10n.leave_blank_for_default_8642_443_with_https,
               ),
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _apiKey,
-              decoration: const InputDecoration(
-                labelText: 'API 密钥',
-                hintText: '来自 ~/.hermes/.env 的 API_SERVER_KEY',
+              decoration: InputDecoration(
+                labelText: context.l10n.api_key,
+                hintText: context.l10n.api_server_key_from_hermes_env,
               ),
               obscureText: true,
             ),
@@ -1334,7 +1533,7 @@ class _AddDialogState extends State<_AddDialog> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '自定义代理和仪表盘信息',
+                      context.l10n.custom_proxy_and_dashboard_details,
                       style: TextStyle(color: Colors.grey[500], fontSize: 13),
                     ),
                   ],
@@ -1345,19 +1544,18 @@ class _AddDialogState extends State<_AddDialog> {
               const SizedBox(height: 8),
               TextField(
                 controller: _gatewayPrefix,
-                decoration: const InputDecoration(
-                  labelText: '网关路径前缀',
-                  hintText:
-                      '例如 /profile/peter（/api/ 和 /v1/ 之前的代理路径）',
+                decoration: InputDecoration(
+                  labelText: context.l10n.gateway_path_prefix,
+                  hintText: context.l10n.example_profile_prefix_hint_full,
                 ),
                 autocorrect: false,
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _dashboardPrefix,
-                decoration: const InputDecoration(
-                  labelText: '仪表盘路径前缀',
-                  hintText: '例如 /dashboard（/api/ 之前的代理路径）',
+                decoration: InputDecoration(
+                  labelText: context.l10n.dashboard_path_prefix,
+                  hintText: context.l10n.e_g_dashboard_proxy_path_before_api,
                 ),
                 autocorrect: false,
               ),
@@ -1365,52 +1563,54 @@ class _AddDialogState extends State<_AddDialog> {
               SwitchListTile(
                 value: _dashboardProxied,
                 contentPadding: EdgeInsets.zero,
-                title: const Text('仪表盘位于代理之后'),
-                subtitle: const Text(
-                  'Nginx 注入认证 — 应用发送干净请求',
+                title: Text(context.l10n.dashboard_behind_proxy),
+                subtitle: Text(
+                  context.l10n.nginx_injects_auth_app_sends_clean_requests,
                 ),
                 onChanged: (v) => setState(() => _dashboardProxied = v),
               ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
-                  '可选，用于记忆/定时任务/技能/设置标签页。留空则使用默认'
-                  '仪表盘端口 (9119) 且无需登录。',
+                  context
+                      .l10n
+                      .optional_for_the_memory_cron_skills_settings_tabs_leave_blank,
                   style: TextStyle(color: Colors.grey[600], fontSize: 12),
                 ),
               ),
               TextField(
                 controller: _dashPort,
-                decoration: const InputDecoration(
-                  labelText: '仪表盘端口',
-                  hintText: '留空使用默认端口 (9119)',
+                decoration: InputDecoration(
+                  labelText: context.l10n.dashboard_port,
+                  hintText: context.l10n.leave_blank_for_default_9119,
                 ),
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _dashUser,
-                decoration: const InputDecoration(
-                  labelText: '仪表盘用户名（可选）',
+                decoration: InputDecoration(
+                  labelText: context.l10n.dashboard_username_optional,
                 ),
                 autocorrect: false,
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _dashPass,
-                decoration: const InputDecoration(
-                  labelText: '仪表盘密码（可选）',
+                decoration: InputDecoration(
+                  labelText: context.l10n.dashboard_password_optional,
                 ),
                 obscureText: true,
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _desktopGatewayUrl,
-                decoration: const InputDecoration(
-                  labelText: '桌面网关 URL（可选）',
+                decoration: InputDecoration(
+                  labelText: context.l10n.desktop_gateway_url_optional,
                   hintText: 'https://hermes-desktop.example.lan',
-                  helperText:
-                      '通过桌面远程网关发送文件附件。',
+                  helperText: context
+                      .l10n
+                      .enables_file_attachments_through_the_desktop_remote_gateway,
                 ),
                 keyboardType: TextInputType.url,
                 autocorrect: false,
@@ -1418,11 +1618,12 @@ class _AddDialogState extends State<_AddDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _gatewayProfile,
-                decoration: const InputDecoration(
-                  labelText: 'Hermes 配置文件 Profile（可选）',
-                  hintText: '例如 sol',
-                  helperText:
-                      '当 Dashboard 聚合多个 Profile 时，指定当前连接聊天的 Profile 名称。单 Profile 隔离部署留空即可。',
+                decoration: InputDecoration(
+                  labelText: context.l10n.hermes_profile_optional,
+                  hintText: context.l10n.e_g_sol,
+                  helperText: context
+                      .l10n
+                      .profile_this_connection_chats_as_when_the_dashboard_serves_several,
                   helperMaxLines: 3,
                 ),
                 autocorrect: false,
@@ -1434,7 +1635,7 @@ class _AddDialogState extends State<_AddDialog> {
       actions: [
         TextButton(
           onPressed: _validating ? null : () => Navigator.pop(context),
-          child: const Text('取消'),
+          child: Text(context.l10n.cancel),
         ),
         FilledButton(
           onPressed: _validating ? null : _validateAndSave,
@@ -1447,7 +1648,9 @@ class _AddDialogState extends State<_AddDialog> {
                     color: Colors.white,
                   ),
                 )
-              : Text(_isEditing ? '保存修改' : '连接'),
+              : Text(
+                  _isEditing ? context.l10n.save_changes : context.l10n.connect,
+                ),
         ),
       ],
     );

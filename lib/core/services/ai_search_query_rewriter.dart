@@ -31,7 +31,7 @@ class AiSearchQueryRewriter {
     if (original.isEmpty) return '';
     if (provider.trim().isEmpty || model.trim().isEmpty) {
       throw const AiSearchRewriteException(
-        '使用 AI 搜索前请先选择一个 AI 搜索模型。',
+        'Choose an AI search model before using AI search.',
       );
     }
 
@@ -60,7 +60,7 @@ class AiSearchQueryRewriter {
 
     if (response.statusCode == 401 || response.statusCode == 403) {
       throw const AiSearchRewriteException(
-        'Hermes API 拒绝了已保存的 API 密钥。',
+        'The Hermes API rejected the saved API key.',
       );
     }
     if (response.statusCode == 404 ||
@@ -71,7 +71,7 @@ class AiSearchQueryRewriter {
     if (response.statusCode != 200) {
       throw AiSearchRewriteException(
         _errorMessage(response.body) ??
-            'AI 查询改写失败，HTTP ${response.statusCode}。',
+            'AI query rewrite failed with HTTP ${response.statusCode}.',
       );
     }
 
@@ -83,7 +83,7 @@ class AiSearchQueryRewriter {
       final rewritten = decoded['query']?.toString().trim() ?? '';
       if (rewritten.isEmpty) {
         throw const AiSearchRewriteException(
-          '所选模型未返回可用的搜索查询。',
+          'The selected model returned no usable search query.',
         );
       }
       return rewritten;
@@ -91,7 +91,7 @@ class AiSearchQueryRewriter {
       rethrow;
     } catch (_) {
       throw const AiSearchRewriteException(
-        'Hermes 返回了格式错误的 AI 改写响应。',
+        'Hermes returned a malformed AI rewrite response.',
       );
     }
   }

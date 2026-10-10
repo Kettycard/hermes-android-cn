@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/gateway_clarify.dart';
 
+import 'package:hermes_android/core/l10n/l10n.dart';
 typedef ClarifyResponder = Future<void> Function(String answer);
 
 class GatewayClarifyDialog extends StatefulWidget {
@@ -75,7 +76,7 @@ class _GatewayClarifyDialogState extends State<GatewayClarifyDialog> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = 'Hermes 无法接受该回答，请重试。';
+        _error = context.l10n.hermes_could_not_accept_the_answer_please_try_again;
       });
     }
   }
@@ -88,7 +89,7 @@ class _GatewayClarifyDialogState extends State<GatewayClarifyDialog> {
 
     return AlertDialog(
       icon: const Icon(Icons.help_outline_rounded),
-      title: const Text('Hermes 需要你的输入'),
+      title: Text(context.l10n.hermes_needs_your_input),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560, maxHeight: 620),
         child: SingleChildScrollView(
@@ -105,8 +106,8 @@ class _GatewayClarifyDialogState extends State<GatewayClarifyDialog> {
                 const SizedBox(height: 12),
                 Text(
                   request.multiSelect
-                      ? '选择一个或多个选项，然后继续。'
-                      : '选择一个选项，或输入其他回答。',
+                      ? context.l10n.select_one_or_more_options_then_continue
+                      : context.l10n.select_one_option_or_enter_another_answer,
                   style: theme.textTheme.bodySmall,
                 ),
                 const SizedBox(height: 6),
@@ -148,8 +149,8 @@ class _GatewayClarifyDialogState extends State<GatewayClarifyDialog> {
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
                   labelText: request.hasChoices
-                      ? '其他回答'
-                      : '你的回答',
+                      ? context.l10n.other_answer
+                      : context.l10n.your_answer,
                 ),
                 onChanged: (value) {
                   setState(() {
@@ -182,7 +183,7 @@ class _GatewayClarifyDialogState extends State<GatewayClarifyDialog> {
         TextButton(
           key: const Key('clarify-skip'),
           onPressed: _submitting ? null : () => _respond(''),
-          child: const Text('跳过'),
+          child: Text(context.l10n.skip),
         ),
         FilledButton(
           key: const Key('clarify-continue'),
@@ -194,7 +195,7 @@ class _GatewayClarifyDialogState extends State<GatewayClarifyDialog> {
                   dimension: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('继续'),
+              : Text(context.l10n.continue_label),
         ),
       ],
     );

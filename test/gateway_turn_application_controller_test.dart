@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hermes_android/core/models/connection.dart';
+import 'package:hermes_android/core/services/desktop_gateway_client.dart';
 import 'package:hermes_android/core/services/gateway_turn_application_controller.dart';
 import 'package:hermes_android/core/services/gateway_turn_coordinator.dart';
 import 'package:hermes_android/core/services/gateway_turn_recovery.dart';
@@ -66,13 +67,66 @@ class _FakeApplicationSession implements GatewayTurnApplicationSession {
   int closeCount = 0;
 
   @override
+  Object setAsyncEventListener(
+    String localSessionId,
+    DesktopAsyncEventCallback listener,
+  ) => Object();
+
+  @override
+  void removeAsyncEventListener(String localSessionId, Object registration) {}
+
+  @override
+  Object setTurnSettledListener(
+    String localSessionId,
+    GatewayTurnSettledCallback listener,
+  ) => Object();
+
+  @override
+  void removeTurnSettledListener(String localSessionId, Object registration) {}
+
+  @override
+  bool ownsApprovalRequest({
+    required String sessionId,
+    required String requestId,
+  }) => false;
+
+  @override
+  Future<bool> tryRespondToApproval({
+    required String sessionId,
+    required String choice,
+    String? requestId,
+  }) async => false;
+
+  @override
+  Future<bool> tryRespondToClarify({
+    required String requestId,
+    required String answer,
+    String? questionId,
+  }) async => false;
+
+  @override
+  Future<bool> tryRespondToSudo({
+    required String requestId,
+    required String password,
+  }) async => false;
+
+  @override
+  Future<bool> tryRespondToSecret({
+    required String requestId,
+    required String value,
+  }) async => false;
+
+  @override
   Future<void> close() async => closeCount++;
 
   @override
-  set onTurnSettled(GatewayTurnSettledCallback? callback) {}
+  Object setSessionBoundListener(
+    String localSessionId,
+    GatewayTurnSessionBoundCallback listener,
+  ) => Object();
 
   @override
-  set onSessionBound(GatewayTurnSessionBoundCallback? callback) {}
+  void removeSessionBoundListener(String localSessionId, Object registration) {}
 
   @override
   Future<void> detachAttachments({

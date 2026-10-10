@@ -1,7 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'dart:io';
+
 import 'package:hermes_android/core/theme/hermes_theme.dart';
 import 'package:hermes_android/core/widgets/hermes_shell.dart';
+import 'support/l10n_test_utils.dart';
+import 'package:hermes_android/l10n/app_localizations.dart';
+
+/// The test environment's default font is Ahem (1em squares), which makes
+/// label measurements meaningless. Load the real Roboto so widths match
+/// devices; CJK stays on fallback boxes, which the short labels still pass.
+Future<void> _loadRoboto() async {
+  final root = Platform.environment['FLUTTER_ROOT'];
+  if (root == null) return;
+  final file = File(
+    '$root/bin/cache/artifacts/material_fonts/Roboto-Regular.ttf',
+  );
+  if (!file.existsSync()) return;
+  final bytes = file.readAsBytesSync();
+  final loader = FontLoader('Roboto')
+    ..addFont(
+      Future.value(
+        ByteData.view(bytes.buffer, bytes.offsetInBytes, bytes.lengthInBytes),
+      ),
+    );
+  await loader.load();
+}
+
+/// The app ships the platform font (family null); the test environment's
+/// default is Ahem (1em squares). Pin the loaded Roboto so measurements
+/// match devices. CJK keeps the fallback boxes, which the short labels pass.
+ThemeData _testTheme(Brightness brightness) {
+  final base = hermesTheme(brightness);
+  return base.copyWith(textTheme: base.textTheme.apply(fontFamily: 'Roboto'));
+}
 
 Future<void> _pumpShell(
   WidgetTester tester, {
@@ -12,6 +46,7 @@ Future<void> _pumpShell(
   Size size = const Size(360, 720),
   double textScale = 1.0,
   Brightness brightness = Brightness.dark,
+  Locale? locale,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -19,7 +54,10 @@ Future<void> _pumpShell(
 
   await tester.pumpWidget(
     MaterialApp(
-      theme: hermesTheme(brightness),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: locale,
+      theme: _testTheme(brightness),
       home: Builder(
         builder: (context) => MediaQuery(
           // Keep the real view metrics; only override the text scale, so the
@@ -43,6 +81,12 @@ Future<void> _pumpShell(
 }
 
 void main() {
+  late AppLocalizations l10n;
+
+  setUpAll(() async {
+    l10n = await loadTestL10n();
+    await _loadRoboto();
+  });
   group('HermesDestination', () {
     test('declares the five validated top-level destinations in order', () {
       expect(HermesDestination.values, [
@@ -58,8 +102,8 @@ void main() {
       final labels = <String>{};
       final icons = <IconData>{};
       for (final destination in HermesDestination.values) {
-        expect(destination.label, isNotEmpty);
-        labels.add(destination.label);
+        expect(destination.label(l10n), isNotEmpty);
+        labels.add(destination.label(l10n));
         icons.add(destination.icon);
         expect(destination.selectedIcon, isNotNull);
       }
@@ -80,6 +124,8 @@ void main() {
       final built = <HermesDestination>[];
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: hermesTheme(Brightness.dark),
           home: HermesShell(
             builder: (context, destination) {
@@ -93,7 +139,7 @@ void main() {
 
       expect(built.toSet(), {HermesDestination.home});
 
-      await tester.tap(find.text(HermesDestination.chats.label));
+      await tester.tap(find.text(HermesDestination.chats.label(l10n)));
       await tester.pumpAndSettle();
 
       expect(built.toSet(), {HermesDestination.home, HermesDestination.chats});
@@ -173,7 +219,7 @@ void main() {
       await _pumpShell(tester);
 
       for (final destination in HermesDestination.values) {
-        await tester.tap(find.text(destination.label));
+        await tester.tap(find.text(destination.label(l10n)));
         await tester.pumpAndSettle();
         expect(find.text('pane:${destination.name}'), findsOneWidget);
       }
@@ -211,6 +257,91 @@ void main() {
       expect(find.text('pane:home'), findsOneWidget);
     });
 
+    testWidgets(
+      'every locale keeps bar labels on one line at both breakpoints',
+      (tester) async {
+        // The app's largest text-size preference (1.30x) at the narrowest
+        // supported widths: every shipped label must render one line and fit
+        // inside its destination.
+        for (final locale in AppLocalizations.supportedLocales) {
+          for (final width in const [320.0, 360.0]) {
+            await _pumpShell(
+              tester,
+              size: Size(width, 720),
+              textScale: 1.3,
+              locale: locale,
+            );
+            final l10n = await AppLocalizations.delegate.load(locale);
+            for (final destination in HermesDestination.values) {
+              final label = destination.label(l10n);
+              // Measure the rendered paragraph, not the reserved label slot:
+              // count distinct line tops of the selection boxes (a wrapped
+              // label yields one top per line).
+              final para = tester.renderObject<RenderParagraph>(
+                find
+                    .descendant(
+                      of: find.byType(NavigationBar),
+                      matching: find.text(label),
+                    )
+                    .first,
+              );
+              final boxes = para.getBoxesForSelection(
+                TextSelection(baseOffset: 0, extentOffset: label.length),
+              );
+              final lineTops = boxes.map((b) => b.top.round()).toSet();
+              expect(
+                lineTops.length,
+                1,
+                reason: '$locale @${width}dp: "$label" must render one line',
+              );
+              final textWidth = boxes.last.right - boxes.first.left;
+              expect(
+                textWidth,
+                lessThanOrEqualTo(width / 5),
+                reason:
+                    '$locale @${width}dp: "$label" must fit its destination',
+              );
+            }
+          }
+        }
+      },
+    );
+
+    testWidgets(
+      'bar labels honour the app text-size preference within the built-in clamp',
+      (tester) async {
+        await _pumpShell(
+          tester,
+          size: const Size(360, 720),
+          textScale: 1.0,
+          locale: const Locale('ja'),
+        );
+        final at1x = tester.getSize(find.text('チャット')).height;
+
+        await _pumpShell(
+          tester,
+          size: const Size(360, 720),
+          textScale: 1.3,
+          locale: const Locale('ja'),
+        );
+        final at13x = tester.getSize(find.text('チャット')).height;
+
+        // The preference must actually scale the label (not be ignored)…
+        expect(at13x, greaterThan(at1x));
+        // …while the label stays a single line at the clamp.
+        expect(at13x, lessThan(20));
+
+        // Beyond the clamp the label must not grow further (still one line).
+        await _pumpShell(
+          tester,
+          size: const Size(360, 720),
+          textScale: 1.8,
+          locale: const Locale('ja'),
+        );
+        expect(tester.getSize(find.text('チャット')).height, lessThan(20));
+      },
+    );
+
     testWidgets('renders in the light theme', (tester) async {
       await _pumpShell(tester, brightness: Brightness.light);
 
@@ -225,9 +356,10 @@ void main() {
 
       for (final destination in HermesDestination.values) {
         expect(
-          find.bySemanticsLabel(RegExp(destination.label)),
+          find.bySemanticsLabel(RegExp(destination.label(l10n))),
           findsWidgets,
-          reason: '${destination.label} must be reachable by screen reader',
+          reason:
+              '${destination.label(l10n)} must be reachable by screen reader',
         );
       }
     });
@@ -246,7 +378,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text(HermesDestination.more.label));
+      await tester.tap(find.text(HermesDestination.more.label(l10n)));
       await tester.pumpAndSettle();
 
       expect(find.text('pane:more'), findsOneWidget);
@@ -287,7 +419,7 @@ void main() {
       );
 
       expect(find.byType(FloatingActionButton), findsOneWidget);
-      await tester.tap(find.text(HermesDestination.more.label));
+      await tester.tap(find.text(HermesDestination.more.label(l10n)));
       await tester.pumpAndSettle();
       expect(find.text('pane:more'), findsOneWidget);
     });

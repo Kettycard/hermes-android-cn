@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hermes_android/core/models/gateway_turn_contract.dart';
 import 'package:hermes_android/core/models/attachment_draft.dart';
+import 'package:hermes_android/core/models/projects_tree_overview.dart';
 import 'package:hermes_android/core/screens/chat_screen.dart';
 import 'package:hermes_android/core/services/attachment_draft_service.dart';
 import 'package:hermes_android/core/services/connection_manager.dart';
@@ -17,6 +18,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/fake_voice_composer_adapter.dart';
+import 'package:hermes_android/l10n/app_localizations.dart';
 
 const _clientTurnId = '123e4567-e89b-42d3-a456-426614174000';
 const _turnId = 'server-turn';
@@ -27,6 +29,248 @@ const _manifestDigest =
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({'verbose_mode': false});
+  });
+
+  test('recovery v2 is reserved for local drafts, not server sessions', () {
+    const serverSession = Session(
+      id: 'server-existing',
+      title: 'Existing chat',
+      model: 'hermes-agent',
+      source: 'gateway',
+      messageCount: 4,
+      isActive: false,
+      preview: 'Earlier message',
+      startedAt: 1,
+    );
+    const localDraft = Session(
+      id: 'mobile-draft',
+      title: 'New chat',
+      model: 'hermes-agent',
+      source: 'mobile',
+      messageCount: 0,
+      isActive: true,
+      preview: '',
+      startedAt: 2,
+      isLocalDraft: true,
+    );
+
+    expect(shouldUseRecoveryV2ForSession(serverSession), isFalse);
+    expect(shouldUseRecoveryV2ForSession(localDraft), isTrue);
+    expect(
+      shouldEstablishLegacyDesktopSession(
+        serverSession,
+        legacyTransportFallback: false,
+      ),
+      isTrue,
+    );
+    expect(
+      shouldEstablishLegacyDesktopSession(
+        localDraft,
+        legacyTransportFallback: false,
+      ),
+      isFalse,
+    );
+    expect(
+      shouldEstablishLegacyDesktopSession(
+        localDraft,
+        legacyTransportFallback: true,
+      ),
+      isTrue,
+    );
+  });
+
+  test('stored session identity wins when resolving the Project header', () {
+    final overview = ProjectsTreeOverview.fromJson({
+      'projects': [
+        {
+          'id': 'project-1',
+          'label': 'Hermes Android',
+          'sessionIds': ['stored-session'],
+        },
+        {
+          'id': ProjectsTreeOverview.noProjectId,
+          'label': 'Home',
+          'isNoProject': true,
+          'sessionIds': ['mobile-draft'],
+        },
+      ],
+    });
+
+    final resolution = resolveChatProjectHeader(overview, const [
+      'stored-session',
+      'mobile-draft',
+    ]);
+
+    expect(resolution.known, isTrue);
+    expect(resolution.projectName, 'Hermes Android');
+  });
+
+  testWidgets(
+    'session binding reconciles an Unassigned header with server placement',
+    (tester) async {
+      final session = _FakeTurnSession([const <GatewayTurnRecoveryState>[]]);
+      var loads = 0;
+      await _pumpChat(
+        tester,
+        turnSession: session,
+        projectOverviewLoader: () async {
+          loads += 1;
+          return ProjectsTreeOverview.fromJson({
+            'projects': [
+              {
+                'id': 'project-1',
+                'label': 'Hermes Android',
+                'sessionIds': ['stored-session'],
+              },
+            ],
+          });
+        },
+      );
+
+      expect(find.text('Unassigned'), findsOneWidget);
+
+      session.bind('recovery-session', 'stored-session');
+      await tester.pumpAndSettle();
+
+      expect(loads, greaterThanOrEqualTo(2));
+      expect(find.text('Hermes Android'), findsOneWidget);
+      expect(find.text('Unassigned'), findsNothing);
+    },
+  );
+
+  testWidgets('disposed chat releases its Project binding listener', (
+    tester,
+  ) async {
+    final session = _FakeTurnSession([const <GatewayTurnRecoveryState>[]]);
+    var loads = 0;
+    await _pumpChat(
+      tester,
+      turnSession: session,
+      projectOverviewLoader: () async {
+        loads += 1;
+        return ProjectsTreeOverview.empty;
+      },
+    );
+    expect(loads, 1);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    session.bind('recovery-session', 'stored-session');
+    await tester.pump();
+
+    expect(loads, 1);
+  });
+
+  testWidgets(
+    'lazy stock fallback binding refreshes the draft Project header',
+    (tester) async {
+      final session = _FakeTurnSession(
+        const <Object>[],
+        recoverError: const GatewayTurnCoordinatorException(
+          GatewayTurnCoordinatorFailure.unsupportedCapability,
+          stockGateway: true,
+        ),
+      );
+      var loads = 0;
+      await _pumpChat(
+        tester,
+        turnSession: session,
+        chatSession: const Session(
+          id: 'mobile-draft',
+          title: 'Draft chat',
+          model: 'fixture-model',
+          source: 'mobile',
+          messageCount: 0,
+          isActive: true,
+          preview: '',
+          startedAt: 1,
+          isLocalDraft: true,
+        ),
+        projectOverviewLoader: () async {
+          loads += 1;
+          return loads == 1
+              ? ProjectsTreeOverview.empty
+              : _projectOverview('Hermes Android', 'stored-draft');
+        },
+        testRemotePromptSubmit:
+            ({
+              required sessionId,
+              required text,
+              required onEvent,
+              required onSent,
+            }) async {
+              session.bind('mobile-draft', 'stored-draft');
+              onSent();
+            },
+      );
+
+      expect(find.text('Unassigned'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'Persist this draft');
+      await tester.tap(find.byTooltip('Send'));
+      await tester.pumpAndSettle();
+
+      expect(loads, greaterThanOrEqualTo(2));
+      expect(find.text('Hermes Android'), findsOneWidget);
+      expect(find.text('Unassigned'), findsNothing);
+    },
+  );
+
+  testWidgets('Project metadata retries after startup failure and reconnect', (
+    tester,
+  ) async {
+    final session = _FakeTurnSession([const <GatewayTurnRecoveryState>[]]);
+    final connectionHook = TestDesktopConnectionHook();
+    var loads = 0;
+    await _pumpChat(
+      tester,
+      turnSession: session,
+      connectionHook: connectionHook,
+      projectOverviewLoader: () async {
+        loads += 1;
+        if (loads == 1) throw StateError('offline at startup');
+        return _projectOverview('Reconnected Project', 'recovery-session');
+      },
+    );
+
+    expect(loads, 1);
+    expect(find.text('Unassigned'), findsOneWidget);
+
+    connectionHook.handler?.call(DesktopConnectionState.connected);
+    await tester.pumpAndSettle();
+
+    expect(loads, 2);
+    expect(find.text('Reconnected Project'), findsOneWidget);
+  });
+
+  testWidgets('stale Project response cannot overwrite a newer generation', (
+    tester,
+  ) async {
+    final session = _FakeTurnSession([const <GatewayTurnRecoveryState>[]]);
+    final stale = Completer<ProjectsTreeOverview>();
+    final current = Completer<ProjectsTreeOverview>();
+    var loads = 0;
+    await _pumpChat(
+      tester,
+      turnSession: session,
+      projectOverviewLoader: () {
+        loads += 1;
+        return loads == 1 ? stale.future : current.future;
+      },
+    );
+
+    expect(loads, 1);
+    session.bind('recovery-session', 'stored-session');
+    await tester.pump();
+    expect(loads, 2);
+
+    current.complete(_projectOverview('Current Project', 'stored-session'));
+    await tester.pumpAndSettle();
+    expect(find.text('Current Project'), findsOneWidget);
+
+    stale.complete(_projectOverview('Stale Project', 'recovery-session'));
+    await tester.pumpAndSettle();
+    expect(find.text('Current Project'), findsOneWidget);
+    expect(find.text('Stale Project'), findsNothing);
   });
 
   testWidgets('resume reconciles and materializes one authoritative response', (
@@ -94,6 +338,46 @@ void main() {
     expect(session.submitCount, 1);
     expect(session.submittedTexts, ['Raw user prompt']);
     expect(session.submittedTexts.single, isNot(contains('@file:')));
+    expect(find.text('Done'), findsOneWidget);
+  });
+
+  testWidgets('v2 terminal state refreshes history skipped during submit', (
+    tester,
+  ) async {
+    final submitGate = Completer<void>();
+    final history = _DelayedRefreshChatHttpClient();
+    final session = _FakeTurnSession(
+      [const <GatewayTurnRecoveryState>[]],
+      submitResult: _completedState('Done'),
+      submitGate: submitGate,
+    );
+    await _pumpChat(
+      tester,
+      turnSession: session,
+      apiClient: ApiClient(
+        baseUrl: 'http://recovery.fixture',
+        apiKey: 'test-key',
+        httpClient: history,
+      ),
+    );
+    await history.firstMessagesUri.future;
+
+    await tester.enterText(find.byType(TextField), 'Durable turn');
+    await tester.tap(find.byTooltip('Send'));
+    await tester.pump();
+    expect(session.submitCount, 1);
+
+    history.releaseFirst();
+    await history.firstResponseReturned.future;
+    await tester.pump();
+    submitGate.complete();
+    final refreshedUri = await history.refreshedMessagesUri.future;
+    expect(refreshedUri.queryParameters, {'limit': '50', 'order': 'latest'});
+    await tester.pumpAndSettle();
+
+    expect(find.text('Stale transcript row'), findsNothing);
+    expect(find.text('Existing transcript row'), findsOneWidget);
+    expect(find.text('Durable turn'), findsOneWidget);
     expect(find.text('Done'), findsOneWidget);
   });
 
@@ -545,12 +829,23 @@ void main() {
 Future<void> _pumpChat(
   WidgetTester tester, {
   required _FakeTurnSession turnSession,
+  Session chatSession = const Session(
+    id: 'recovery-session',
+    title: 'Recovery chat',
+    model: 'fixture-model',
+    source: 'test',
+    messageCount: 0,
+    isActive: true,
+    preview: '',
+    startedAt: 1,
+  ),
   ApiClient? apiClient,
   TestRemotePromptSubmit? testRemotePromptSubmit,
   TestRemoteAttachmentUpload? testRemoteAttachmentUpload,
   AttachmentDraftService? attachmentDraftService,
   List<AttachmentDraft> initialDrafts = const [],
   TestDesktopConnectionHook? connectionHook,
+  TestProjectOverviewLoader? projectOverviewLoader,
 }) async {
   apiClient ??= ApiClient(
     baseUrl: 'http://recovery.fixture',
@@ -559,6 +854,8 @@ Future<void> _pumpChat(
   );
   await tester.pumpWidget(
     MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: ChatScreen(
         connection: SavedConnection(
           id: 'recovery-fixture',
@@ -567,16 +864,7 @@ Future<void> _pumpChat(
           port: 8642,
           apiKey: 'synthetic-key',
         ),
-        session: const Session(
-          id: 'recovery-session',
-          title: 'Recovery chat',
-          model: 'fixture-model',
-          source: 'test',
-          messageCount: 0,
-          isActive: true,
-          preview: '',
-          startedAt: 1,
-        ),
+        session: chatSession,
         testApiClient: apiClient,
         testTurnApplicationSession: turnSession,
         testRemotePromptSubmit: testRemotePromptSubmit,
@@ -584,6 +872,7 @@ Future<void> _pumpChat(
         testAttachmentDraftService: attachmentDraftService,
         testInitialAttachmentDrafts: initialDrafts,
         testDesktopConnectionHook: connectionHook,
+        testProjectOverviewLoader: projectOverviewLoader,
         testVoiceComposerAdapter: FakeVoiceComposerAdapter(),
       ),
     ),
@@ -591,6 +880,18 @@ Future<void> _pumpChat(
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 100));
   await tester.pump(const Duration(milliseconds: 100));
+}
+
+ProjectsTreeOverview _projectOverview(String label, String sessionId) {
+  return ProjectsTreeOverview.fromJson({
+    'projects': [
+      {
+        'id': 'project-${label.toLowerCase().replaceAll(' ', '-')}',
+        'label': label,
+        'sessionIds': [sessionId],
+      },
+    ],
+  });
 }
 
 GatewayTurnRecoveryState _acceptedState() =>
@@ -644,6 +945,62 @@ class _FakeTurnSession implements GatewayTurnApplicationSession {
   int stageCount = 0;
   int closeCount = 0;
   final List<String> submittedTexts = [];
+  GatewayTurnSessionBoundCallback? _onSessionBound;
+  Object? _sessionBoundRegistration;
+
+  void bind(String localSessionId, String storedSessionId) {
+    _onSessionBound?.call(localSessionId, storedSessionId);
+  }
+
+  @override
+  Object setAsyncEventListener(
+    String localSessionId,
+    DesktopAsyncEventCallback listener,
+  ) => Object();
+
+  @override
+  void removeAsyncEventListener(String localSessionId, Object registration) {}
+
+  @override
+  Object setTurnSettledListener(
+    String localSessionId,
+    GatewayTurnSettledCallback listener,
+  ) => Object();
+
+  @override
+  void removeTurnSettledListener(String localSessionId, Object registration) {}
+
+  @override
+  bool ownsApprovalRequest({
+    required String sessionId,
+    required String requestId,
+  }) => false;
+
+  @override
+  Future<bool> tryRespondToApproval({
+    required String sessionId,
+    required String choice,
+    String? requestId,
+  }) async => false;
+
+  @override
+  Future<bool> tryRespondToClarify({
+    required String requestId,
+    required String answer,
+    String? questionId,
+  }) async => false;
+
+  @override
+  Future<bool> tryRespondToSudo({
+    required String requestId,
+    required String password,
+  }) async => false;
+
+  @override
+  Future<bool> tryRespondToSecret({
+    required String requestId,
+    required String value,
+  }) async => false;
 
   _FakeTurnSession(
     this._recoverResults, {
@@ -695,10 +1052,22 @@ class _FakeTurnSession implements GatewayTurnApplicationSession {
   Future<void> close() async => closeCount++;
 
   @override
-  set onTurnSettled(GatewayTurnSettledCallback? callback) {}
+  Object setSessionBoundListener(
+    String localSessionId,
+    GatewayTurnSessionBoundCallback listener,
+  ) {
+    final token = Object();
+    _sessionBoundRegistration = token;
+    _onSessionBound = listener;
+    return token;
+  }
 
   @override
-  set onSessionBound(GatewayTurnSessionBoundCallback? callback) {}
+  void removeSessionBoundListener(String localSessionId, Object registration) {
+    if (!identical(_sessionBoundRegistration, registration)) return;
+    _sessionBoundRegistration = null;
+    _onSessionBound = null;
+  }
 
   @override
   Future<void> detachAttachments({
@@ -755,6 +1124,53 @@ class _EmptyChatHttpClient extends http.BaseClient {
       headers: {'content-type': 'application/json'},
     );
   }
+}
+
+class _DelayedRefreshChatHttpClient extends http.BaseClient {
+  final Completer<Uri> firstMessagesUri = Completer<Uri>();
+  final Completer<Uri> refreshedMessagesUri = Completer<Uri>();
+  final Completer<void> firstResponseReturned = Completer<void>();
+  final Completer<void> _releaseFirst = Completer<void>();
+  int _messageRequestCount = 0;
+
+  void releaseFirst() {
+    if (!_releaseFirst.isCompleted) _releaseFirst.complete();
+  }
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    if (request.method == 'GET' && request.url.path.endsWith('/messages')) {
+      _messageRequestCount += 1;
+      if (_messageRequestCount == 1) {
+        firstMessagesUri.complete(request.url);
+        await _releaseFirst.future;
+        firstResponseReturned.complete();
+        return _response([
+          {'role': 'assistant', 'content': 'Stale transcript row'},
+        ]);
+      }
+      if (!refreshedMessagesUri.isCompleted) {
+        refreshedMessagesUri.complete(request.url);
+      }
+      return _response([
+        {'role': 'assistant', 'content': 'Existing transcript row'},
+        {'role': 'user', 'content': 'Durable turn'},
+        {'role': 'assistant', 'content': 'Done'},
+      ]);
+    }
+    return http.StreamedResponse(
+      Stream.value(utf8.encode(jsonEncode({'error': 'unexpected request'}))),
+      404,
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  http.StreamedResponse _response(List<Map<String, dynamic>> messages) =>
+      http.StreamedResponse(
+        Stream.value(utf8.encode(jsonEncode({'data': messages}))),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
 }
 
 class _ResyncChatHttpClient extends http.BaseClient {

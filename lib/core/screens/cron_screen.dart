@@ -13,6 +13,7 @@ import '../services/connection_manager.dart';
 import '../utils/relative_time.dart';
 import 'chat_screen.dart';
 
+import 'package:hermes_android/core/l10n/l10n.dart';
 class CronScreen extends StatefulWidget {
   final SavedConnection connection;
   const CronScreen({required this.connection, super.key});
@@ -102,7 +103,7 @@ class _CronScreenState extends State<CronScreen> {
   }
 
   String _jobName(Map<String, dynamic> job) {
-    return job['name'] as String? ?? job['id'] as String? ?? '未命名';
+    return job['name'] as String? ?? job['id'] as String? ?? 'Untitled';
   }
 
   String _jobPrompt(Map<String, dynamic> job) {
@@ -129,13 +130,13 @@ class _CronScreenState extends State<CronScreen> {
       if (mounted) {
         setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(paused ? '已恢复' : '已暂停')),
+          SnackBar(content: Text(paused ? context.l10n.job_resumed : context.l10n.job_paused)),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('失败：$e'), backgroundColor: Colors.orange),
+          SnackBar(content: Text(context.l10n.failed(e)), backgroundColor: Colors.orange),
         );
       }
     }
@@ -149,17 +150,17 @@ class _CronScreenState extends State<CronScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('删除定时任务'),
-        content: Text('删除"$name"？'),
+        title: Text(context.l10n.delete_cron_job),
+        content: Text(context.l10n.delete_2(name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('删除'),
+            child: Text(context.l10n.delete),
           ),
         ],
       ),
@@ -173,13 +174,13 @@ class _CronScreenState extends State<CronScreen> {
         setState(() => _jobs.removeWhere((j) => j['id'] == jobId));
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('已删除"$name"')));
+        ).showSnackBar(SnackBar(content: Text(context.l10n.deleted(name))));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('删除失败：$e'),
+            content: Text(context.l10n.delete_failed(e)),
             backgroundColor: Colors.orange,
           ),
         );
@@ -195,12 +196,12 @@ class _CronScreenState extends State<CronScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('已触发任务')));
+        ).showSnackBar(SnackBar(content: Text(context.l10n.job_triggered)));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('失败：$e'), backgroundColor: Colors.orange),
+          SnackBar(content: Text(context.l10n.failed(e)), backgroundColor: Colors.orange),
         );
       }
     }
@@ -273,13 +274,13 @@ class _CronScreenState extends State<CronScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                '无法加载运行记录：$error',
+                context.l10n.couldn_t_load_runs(error),
                 style: const TextStyle(fontSize: 12, color: Colors.orange),
               ),
             ),
             TextButton(
               onPressed: () => unawaited(_loadRuns(jobId)),
-              child: const Text('重试'),
+              child: Text(context.l10n.retry),
             ),
           ],
         ),
@@ -287,10 +288,10 @@ class _CronScreenState extends State<CronScreen> {
     }
     final runs = _runsByJob[jobId] ?? const <Session>[];
     if (runs.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
         child: Text(
-          '暂无运行记录。',
+          context.l10n.no_runs_yet,
           style: TextStyle(fontSize: 12, color: Colors.grey),
         ),
       );
@@ -311,7 +312,7 @@ class _CronScreenState extends State<CronScreen> {
               color: run.isActive ? Colors.green : Colors.grey,
             ),
             title: Text(
-              run.title.isEmpty ? '定时任务' : run.title,
+              run.title.isEmpty ? context.l10n.cron_run : run.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 13),
@@ -336,8 +337,8 @@ class _CronScreenState extends State<CronScreen> {
 
   Future<void> _showAddJobDialog() async {
     final result = await _showJobDialog(
-      title: '添加定时任务',
-      actionLabel: '添加',
+      title: context.l10n.add_cron_job,
+      actionLabel: context.l10n.add,
     );
     if (result == null || !mounted) return;
 
@@ -357,13 +358,13 @@ class _CronScreenState extends State<CronScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('已添加定时任务')));
+      ).showSnackBar(SnackBar(content: Text(context.l10n.cron_job_added)));
       await _loadJobs();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('添加任务失败：$e'),
+            content: Text(context.l10n.failed_to_add_job(e)),
             backgroundColor: Colors.orange,
           ),
         );
@@ -373,8 +374,8 @@ class _CronScreenState extends State<CronScreen> {
 
   Future<void> _showEditJobDialog(Map<String, dynamic> job) async {
     final result = await _showJobDialog(
-      title: '编辑定时任务',
-      actionLabel: '保存',
+      title: context.l10n.edit_cron_job,
+      actionLabel: context.l10n.save,
       initialName: _jobName(job),
       initialPrompt: job['prompt'] as String? ?? '',
       initialSchedule: _scheduleDisplay(job),
@@ -390,13 +391,13 @@ class _CronScreenState extends State<CronScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('已更新定时任务')));
+      ).showSnackBar(SnackBar(content: Text(context.l10n.cron_job_updated)));
       await _loadJobs();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('更新任务失败：$e'),
+            content: Text(context.l10n.failed_to_update_job(e)),
             backgroundColor: Colors.orange,
           ),
         );
@@ -429,35 +430,35 @@ class _CronScreenState extends State<CronScreen> {
                 children: [
                   TextField(
                     controller: nameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: '名称',
-                      hintText: '例如：每日备份',
+                    decoration: InputDecoration(
+                      labelText: context.l10n.name,
+                      hintText: context.l10n.e_g_daily_backup,
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: promptCtrl,
-                    decoration: const InputDecoration(
-                      labelText: '提示词',
-                      hintText: '希望智能体执行什么？',
+                    decoration: InputDecoration(
+                      labelText: context.l10n.prompt,
+                      hintText: context.l10n.what_should_the_agent_do,
                     ),
                     maxLines: 3,
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: scheduleCtrl,
-                    decoration: const InputDecoration(
-                      labelText: '计划',
-                      hintText: '例如：0 9 * * * 或每隔 2 小时',
+                    decoration: InputDecoration(
+                      labelText: context.l10n.schedule,
+                      hintText: context.l10n.e_g_0_9_or_every_2h,
                     ),
                   ),
                   const SizedBox(height: 12),
                   SwitchListTile(
                     value: noAgent,
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('仅脚本（无智能体）'),
-                    subtitle: const Text(
-                      '适用于由脚本支撑的定时任务。',
+                    title: Text(context.l10n.script_only_no_agent),
+                    subtitle: Text(
+                      context.l10n.use_for_cron_jobs_backed_by_scripts,
                     ),
                     onChanged: (value) => setDialogState(() => noAgent = value),
                   ),
@@ -467,7 +468,7 @@ class _CronScreenState extends State<CronScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('取消'),
+                child: Text(context.l10n.cancel),
               ),
               FilledButton(
                 onPressed: () {
@@ -477,9 +478,9 @@ class _CronScreenState extends State<CronScreen> {
 
                   if (name.isEmpty || prompt.isEmpty || schedule.isEmpty) {
                     ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
+                      SnackBar(
                         content: Text(
-                          '名称、提示词和计划为必填项',
+                          context.l10n.name_prompt_and_schedule_are_required,
                         ),
                       ),
                     );
@@ -512,7 +513,7 @@ class _CronScreenState extends State<CronScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('定时任务'),
+        title: Text(context.l10n.cron_jobs),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -522,7 +523,7 @@ class _CronScreenState extends State<CronScreen> {
       ),
       body: _buildBody(),
       floatingActionButton: FloatingActionButton(
-        tooltip: '添加新定时任务',
+        tooltip: context.l10n.add_new_cron_job,
         onPressed: _loading ? null : _showAddJobDialog,
         child: const Icon(Icons.add),
       ),
@@ -544,7 +545,7 @@ class _CronScreenState extends State<CronScreen> {
               const Icon(Icons.error_outline, size: 48, color: Colors.orange),
               const SizedBox(height: 16),
               Text(
-                '加载定时任务失败',
+                context.l10n.failed_to_load_cron_jobs,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
@@ -554,7 +555,7 @@ class _CronScreenState extends State<CronScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              ElevatedButton(onPressed: _loadJobs, child: const Text('重试')),
+              ElevatedButton(onPressed: _loadJobs, child: Text(context.l10n.retry)),
             ],
           ),
         ),
@@ -568,7 +569,7 @@ class _CronScreenState extends State<CronScreen> {
           children: [
             Icon(Icons.schedule, size: 48, color: Colors.grey[600]),
             const SizedBox(height: 16),
-            Text('暂无定时任务', style: Theme.of(context).textTheme.titleLarge),
+            Text(context.l10n.no_cron_jobs, style: Theme.of(context).textTheme.titleLarge),
           ],
         ),
       );
@@ -637,7 +638,7 @@ class _CronScreenState extends State<CronScreen> {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
-                              '脚本',
+                              'script',
                               style: TextStyle(
                                 fontSize: 10,
                                 color: Colors.blue,
@@ -652,23 +653,23 @@ class _CronScreenState extends State<CronScreen> {
                             if (action == 'delete') _deleteJob(job);
                           },
                           itemBuilder: (_) => [
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'trigger',
                               child: Row(
                                 children: [
                                   Icon(Icons.play_arrow, size: 18),
                                   SizedBox(width: 8),
-                                  Text('立即触发'),
+                                  Text(context.l10n.trigger_now),
                                 ],
                               ),
                             ),
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'edit',
                               child: Row(
                                 children: [
                                   Icon(Icons.edit, size: 18),
                                   SizedBox(width: 8),
-                                  Text('编辑'),
+                                  Text(context.l10n.edit),
                                 ],
                               ),
                             ),
@@ -681,11 +682,11 @@ class _CronScreenState extends State<CronScreen> {
                                     size: 18,
                                   ),
                                   const SizedBox(width: 8),
-                                  Text(paused ? '恢复' : '暂停'),
+                                  Text(paused ? 'Resume' : 'Pause'),
                                 ],
                               ),
                             ),
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'delete',
                               child: Row(
                                 children: [
@@ -696,7 +697,7 @@ class _CronScreenState extends State<CronScreen> {
                                   ),
                                   SizedBox(width: 8),
                                   Text(
-                                    '删除',
+                                    context.l10n.delete,
                                     style: TextStyle(color: Colors.red),
                                   ),
                                 ],
@@ -741,13 +742,13 @@ class _CronScreenState extends State<CronScreen> {
                     if (lastRun != null && lastRun.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
-                        '上次：$lastRun',
+                        context.l10n.last(lastRun),
                         style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                       ),
                     ],
                     if (nextRun != null && nextRun.isNotEmpty)
                       Text(
-                        '下次：$nextRun',
+                        context.l10n.next(nextRun),
                         style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                       ),
                     if (expanded) ...[

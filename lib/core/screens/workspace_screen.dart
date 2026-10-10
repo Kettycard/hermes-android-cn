@@ -51,6 +51,8 @@ import 'skills_screen.dart';
 import '../widgets/share_text_review_sheet.dart';
 import 'workspace_sessions_screen.dart';
 
+import 'package:hermes_android/core/l10n/l10n.dart';
+
 /// Builds the Projects repository for a connection. Injectable for tests.
 typedef ProjectsRepositoryFactory =
     ProjectsRepository Function(SavedConnection connection);
@@ -134,6 +136,10 @@ class WorkspaceScreen extends StatefulWidget {
   /// screen pushes the chat itself, so the shell is never a dead end.
   final ValueChanged<Session>? onOpenSession;
 
+  /// Periodic silent refresh for the session lists (running/idle chips).
+  /// Null (tests) disables the timer; the app passes a modest interval.
+  final Duration? sessionsRefreshInterval;
+
   /// Owns durable turn recovery above this screen's lifetime. Passed to every
   /// chat opened from Home so a turn survives leaving the chat.
   final GatewayTurnApplicationController? turnApplicationController;
@@ -203,6 +209,7 @@ class WorkspaceScreen extends StatefulWidget {
     this.initialQuickChat = false,
     this.sharedAttachmentPreparer,
     this.onOpenDashboard,
+    this.sessionsRefreshInterval,
     super.key,
   });
 
@@ -547,6 +554,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     await _initialization;
     if (!mounted) return;
     final draft = buildNewChatDraft(
+      l10n: context.l10n,
       mode: NewChatMode.quickChat,
       sessionId:
           (widget.newChatSessionIdFactory ??
@@ -617,13 +625,14 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('无法准备共享文件。')),
+        SnackBar(content: Text(context.l10n.couldn_t_prepare_the_shared_files)),
       );
       return;
     }
     if (!mounted) return;
 
     final draft = buildNewChatDraft(
+      l10n: context.l10n,
       mode: decision.mode,
       sessionId:
           (widget.newChatSessionIdFactory ??
@@ -646,6 +655,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         decision.action,
         text,
         hasAttachments: attachments.isNotEmpty,
+        l10n: context.l10n,
       ),
       initialAttachmentDrafts: attachments,
     );
@@ -726,9 +736,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     switch (destination) {
       case HermesDestination.chats:
         return WorkspaceSessionsScreen(
-          title: '对话',
+          title: context.l10n.chats,
           view: WorkspaceSessionView.all,
           embedded: true,
+          refreshInterval: widget.sessionsRefreshInterval,
           load: _loadWorkspaceSessionsData,
           onOpenSession: (session) => unawaited(
             _openSession(session, projectName: _chatProjectLabels[session.id]),
@@ -746,10 +757,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           );
         }
         if (repository == null) {
-          return const ErrorState.unsupported(
-            title: '项目暂不可用',
-            message:
-                '项目需要 Desktop Gateway 连接。将 Desktop Gateway URL 添加到此连接，即可跨设备整理对话。',
+          return ErrorState.unsupported(
+            title: context.l10n.projects_unavailable,
+            message: context
+                .l10n
+                .projects_need_a_desktop_gateway_connection_add_the_desktop_gateway,
           );
         }
         return ProjectsPane(
@@ -774,7 +786,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         );
       case HermesDestination.more:
         return MorePane(
-          sections: buildMoreSections(dashboardReachable: _dashboardReachable),
+          sections: buildMoreSections(
+            dashboardReachable: _dashboardReachable,
+            l10n: context.l10n,
+          ),
           onSelect: _openMoreEntry,
         );
     }
@@ -807,7 +822,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (launched || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('无法打开 Hermes 仪表盘。')),
+      SnackBar(content: Text(context.l10n.could_not_open_the_hermes_dashboard)),
     );
   }
 
@@ -877,7 +892,12 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         .firstOrNull;
 
     final project =
-        known ?? HermesProject(id: projectId, slug: projectId, name: '项目');
+        known ??
+        HermesProject(
+          id: projectId,
+          slug: projectId,
+          name: context.l10n.project,
+        );
 
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -915,7 +935,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   void _openInbox() {
     _push(
       Scaffold(
-        appBar: AppBar(title: const Text('收件箱')),
+        appBar: AppBar(title: Text(context.l10n.inbox)),
         body: ActivityPane(
           key: _inboxKey,
           loadFeed: _loadActivity,
@@ -980,6 +1000,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   /// mode or Project again. The same commit-before-open path is reused.
   Future<void> _startProjectChat(HermesProject project) async {
     final draft = buildNewChatDraft(
+      l10n: context.l10n,
       mode: NewChatMode.projectChat,
       sessionId:
           (widget.newChatSessionIdFactory ??
@@ -1002,7 +1023,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
     final mode = await showModalBottomSheet<NewChatMode>(
       context: context,
-      builder: (_) => NewChatSheet(options: buildNewChatOptionsFor(view)),
+      builder: (_) =>
+          NewChatSheet(options: buildNewChatOptionsFor(context.l10n, view)),
     );
     if (mode == null || !mounted) return;
 
@@ -1024,6 +1046,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     }
 
     final draft = buildNewChatDraft(
+      l10n: context.l10n,
       mode: mode,
       sessionId:
           (widget.newChatSessionIdFactory ??
@@ -1074,10 +1097,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         final messenger = ScaffoldMessenger.of(context);
         messenger.hideCurrentSnackBar();
         messenger.showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              '此项目没有可打开对话的文件夹 — 对话已作为未分配打开。'
-              '为项目添加文件夹即可归类其对话。',
+              context.l10n.this_project_has_no_folder_to_open_the_chat_in,
             ),
             duration: Duration(seconds: 6),
           ),
@@ -1190,15 +1212,16 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
   void _openWorkspaceSessionView(WorkspaceSessionView view) {
     final title = switch (view) {
-      WorkspaceSessionView.all => '全部对话',
-      WorkspaceSessionView.unassigned => '未分配对话',
-      WorkspaceSessionView.archivedQuick => '已归档的快捷对话',
-      WorkspaceSessionView.search => '搜索',
+      WorkspaceSessionView.all => context.l10n.all_chats,
+      WorkspaceSessionView.unassigned => context.l10n.unassigned_chats,
+      WorkspaceSessionView.archivedQuick => context.l10n.archived_quick_chats,
+      WorkspaceSessionView.search => context.l10n.search,
     };
     _push(
       WorkspaceSessionsScreen(
         title: title,
         view: view,
+        refreshInterval: widget.sessionsRefreshInterval,
         load: _loadWorkspaceSessionsData,
         onOpenSession: (session) => unawaited(_openSession(session)),
         onPromote: switch (view) {
@@ -1356,8 +1379,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           if (_destination == HermesDestination.home) ...[
             IconButton(
               tooltip: _inboxActionCount == 0
-                  ? '打开收件箱'
-                  : '打开收件箱（$_inboxActionCount）',
+                  ? context.l10n.open_inbox
+                  : context.l10n.open_inbox_2(_inboxActionCount),
               onPressed: _openInbox,
               icon: Badge(
                 isLabelVisible: _inboxActionCount > 0,
@@ -1366,7 +1389,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
               ),
             ),
             IconButton(
-              tooltip: '搜索全部对话',
+              tooltip: context.l10n.search_all_chats,
               onPressed: () =>
                   _openWorkspaceSessionView(WorkspaceSessionView.search),
               icon: const Icon(Icons.search),
@@ -1394,7 +1417,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                 key: kWorkspaceNewChatButtonKey,
                 onPressed: () => unawaited(_startNewChat()),
                 icon: const Icon(Icons.add),
-                label: const Text('新建'),
+                label: Text(context.l10n.new_label),
               )
             : null,
         builder: _pane,

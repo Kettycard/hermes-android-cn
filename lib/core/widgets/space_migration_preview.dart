@@ -17,6 +17,7 @@ import '../services/projects_repository.dart';
 import '../theme/hermes_theme.dart';
 import 'hermes_components.dart';
 
+import 'package:hermes_android/core/l10n/l10n.dart';
 class SpaceMigrationPreview extends StatefulWidget {
   final SpaceMigrationPlan plan;
   final VoidCallback? onDismiss;
@@ -38,18 +39,15 @@ class _SpaceMigrationPreviewState extends State<SpaceMigrationPreview> {
   SpaceMigrationResult? _result;
   Object? _error;
 
-  static String _chats(int count) => count == 1 ? '1 个对话' : '$count 个对话';
+  String _chats(int count) => context.l10n.chats_count(count);
 
   String get _summary {
     final plan = widget.plan;
-    final spaces = plan.entries.length == 1
-        ? '1 个空间'
-        : '${plan.entries.length} 个空间';
+    final spaces = context.l10n.spaces_count(plan.entries.length);
     final toCreate = plan.projectsToCreate;
     final projects = switch (toCreate) {
-      0 => '无需创建新项目',
-      1 => '需创建 1 个项目',
-      _ => '需创建 $toCreate 个项目',
+      0 => context.l10n.no_new_projects_needed,
+      _ => context.l10n.projects_to_create(toCreate),
     };
     return '$spaces · ${_chats(plan.sessionsToLink)} · $projects';
   }
@@ -82,14 +80,14 @@ class _SpaceMigrationPreviewState extends State<SpaceMigrationPreview> {
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const EmptyState(
+          EmptyState(
             icon: Icons.swap_horiz_rounded,
-            title: '没有可迁移的内容',
+            title: context.l10n.nothing_to_migrate,
             message:
-                '未找到此连接的本地空间，项目已经是这里唯一使用的组织方式。',
+                context.l10n.no_local_spaces_were_found_for_this_connection_so_projects,
           ),
           if (widget.onDismiss != null)
-            TextButton(onPressed: widget.onDismiss, child: const Text('关闭')),
+            TextButton(onPressed: widget.onDismiss, child: Text(context.l10n.close)),
         ],
       );
     }
@@ -97,7 +95,7 @@ class _SpaceMigrationPreviewState extends State<SpaceMigrationPreview> {
     return ListView(
       padding: const EdgeInsets.only(bottom: HermesSpacing.xl),
       children: [
-        const SectionHeader(title: '迁移预览'),
+        SectionHeader(title: context.l10n.migration_preview),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: HermesSpacing.lg),
           child: Text(
@@ -109,7 +107,7 @@ class _SpaceMigrationPreviewState extends State<SpaceMigrationPreview> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: HermesSpacing.lg),
           child: Text(
-            '尚未移动任何内容 — 这只是迁移将会执行的操作。',
+            context.l10n.nothing_has_moved_yet_this_is_only_what_a_migration,
             style: tokens.typography.label.copyWith(color: tokens.muted),
           ),
         ),
@@ -123,22 +121,25 @@ class _SpaceMigrationPreviewState extends State<SpaceMigrationPreview> {
                 children: [
                   Text(
                     result.isComplete
-                        ? '迁移完成'
-                        : '迁移未完成',
+                        ? context.l10n.migration_complete
+                        : context.l10n.migration_incomplete,
                     style: tokens.typography.section.copyWith(
                       color: tokens.onSurface,
                     ),
                   ),
                   const SizedBox(height: HermesSpacing.xs),
                   Text(
-                    '已迁移 ${result.linkedSessions} 个对话 · '
-                    '已创建 ${result.createdProjects} 个项目',
+                    context.l10n.chats_migrated_projects_created(
+                      result.createdProjects,
+                      result.linkedSessions,
+                    ),
                     style: tokens.typography.body.copyWith(color: tokens.muted),
                   ),
                   if (result.unlinkedSessions > 0)
                     Text(
-                      '${result.unlinkedSessions} 个对话仍保留在本地空间中，'
-                      '可以安全地重试。',
+                      context.l10n.chats_stayed_in_local_spaces(
+                        result.unlinkedSessions,
+                      ),
                       style: tokens.typography.body.copyWith(
                         color: tokens.muted,
                       ),
@@ -153,7 +154,7 @@ class _SpaceMigrationPreviewState extends State<SpaceMigrationPreview> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: HermesSpacing.lg),
             child: Text(
-              '迁移失败。本地空间保持不变。',
+              context.l10n.migration_failed_local_spaces_were_kept_unchanged,
               style: tokens.typography.body.copyWith(color: tokens.danger),
             ),
           ),
@@ -180,7 +181,9 @@ class _SpaceMigrationPreviewState extends State<SpaceMigrationPreview> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.swap_horiz_rounded),
-              label: Text(_migrating ? '迁移中…' : '迁移'),
+              label: Text(
+                _migrating ? context.l10n.migrating : context.l10n.migrate,
+              ),
             ),
           ),
         if (widget.onDismiss != null)
@@ -188,7 +191,7 @@ class _SpaceMigrationPreviewState extends State<SpaceMigrationPreview> {
             padding: const EdgeInsets.symmetric(horizontal: HermesSpacing.lg),
             child: TextButton(
               onPressed: _migrating ? null : widget.onDismiss,
-              child: const Text('关闭'),
+              child: Text(context.l10n.close),
             ),
           ),
       ],
@@ -205,9 +208,7 @@ class _EntryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = HermesTokens.of(context);
     final matched = entry.matchedProject;
-    final assigned = entry.sessionCount == 1
-        ? '1 个已分配对话'
-        : '${entry.sessionCount} 个已分配对话';
+    final assigned = context.l10n.assigned_chats(entry.sessionCount);
 
     return HermesCard(
       child: Column(
@@ -231,15 +232,15 @@ class _EntryCard extends StatelessWidget {
                 status: matched == null
                     ? HermesStatus.blocked
                     : HermesStatus.completed,
-                label: matched == null ? '新建项目' : '已匹配',
+                label: matched == null ? context.l10n.new_project : context.l10n.matched,
               ),
             ],
           ),
           const SizedBox(height: HermesSpacing.xs),
           Text(
             matched == null
-                ? '没有名称匹配的服务器项目 · $assigned'
-                : '匹配 ${matched.name} · $assigned',
+                ? context.l10n.no_server_project_matches_this_name(assigned)
+                : context.l10n.matches(assigned, matched.name),
             style: tokens.typography.body.copyWith(color: tokens.muted),
           ),
         ],
