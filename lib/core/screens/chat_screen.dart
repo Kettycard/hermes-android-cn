@@ -2204,13 +2204,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _showModelSelector() async {
-    if (_pendingReattachResync) return;
-    await _sessionModelRestore;
-    if (!mounted || _pendingReattachResync) return;
-    final desktopGateway = _desktopGateway;
-
+    if (_pendingReattachResync || _loadingModelOptions) return;
     setState(() => _loadingModelOptions = true);
     try {
+      await _sessionModelRestore;
+      if (!mounted || _pendingReattachResync) return;
+      final desktopGateway = _desktopGateway;
+
       // API-server-only connections deliberately stay on port 8642. The API
       // server exposes both the model inventory and the current session model;
       // no Dashboard client or :9119 transport is needed for the picker.
@@ -2496,7 +2496,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           provider: choice.provider,
           model: choice.model,
           createSessionIfMissing: widget.session.isLocalDraft,
-          title: widget.session.title,
         );
       }
       final store = await _chatModelStore;
@@ -2637,11 +2636,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     await _gateway.sendMessageStreaming(
       message: text,
       sessionId: widget.session.id,
-      // API-server-only selections are held by its durable session lock. Keep
-      // those requests on the virtual model so a bare model id cannot lose its
-      // provider identity. Preserve the existing Dashboard fallback behaviour.
-      model: _desktopGateway != null && _sessionModelOverride
-          ? _sessionModel
+      // The OpenAI-compatible endpoint does not consume the API session's
+      // persisted Browser lock. Carry both ids on API-only turns so duplicate
+      // model names cannot silently fall back to another provider. Desktop
+      // Gateway keeps its existing model-only request behaviour.
+      model: _sessionModelOverride ? _sessionModel : null,
+      provider: _desktopGateway == null && _sessionModelOverride
+          ? _sessionProvider
           : null,
       history: history,
       imageDataUrl: imageDataUrl,

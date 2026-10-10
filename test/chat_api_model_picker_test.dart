@@ -161,7 +161,11 @@ void main() {
       expect(chatIndex, greaterThan(lockIndex));
       expect(
         requestBodies['/v1/chat/completions'],
-        containsPair('model', 'hermes-agent'),
+        containsPair('model', 'new-model'),
+      );
+      expect(
+        requestBodies['/v1/chat/completions'],
+        containsPair('provider', 'nous'),
       );
       expect(requests.any((request) => request.url.port == 9119), isFalse);
     },
@@ -252,7 +256,6 @@ void main() {
     expect(bodies['/api/sessions'], {
       'id': 'draft-session',
       'source': 'api_server',
-      'title': 'Draft chat',
       'provider': 'nous',
       'model': 'new-model',
       'require_model_lock': true,
@@ -272,10 +275,8 @@ void main() {
           request.url.path == '/v1/chat/completions',
     );
     expect(chatIndex, greaterThan(createIndex));
-    expect(
-      bodies['/v1/chat/completions'],
-      containsPair('model', 'hermes-agent'),
-    );
+    expect(bodies['/v1/chat/completions'], containsPair('model', 'new-model'));
+    expect(bodies['/v1/chat/completions'], containsPair('provider', 'nous'));
   });
 
   testWidgets('duplicate model ids require an explicit provider choice', (

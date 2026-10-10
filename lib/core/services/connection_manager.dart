@@ -882,7 +882,6 @@ class ApiClient {
     required String provider,
     required String model,
     bool createSessionIfMissing = false,
-    String? title,
   }) async {
     final body = {
       'provider': provider,
@@ -897,7 +896,6 @@ class ApiClient {
             body: jsonEncode({
               'id': sessionId,
               'source': 'api_server',
-              if (title?.trim().isNotEmpty == true) 'title': title!.trim(),
               ...body,
             }),
           )
@@ -1053,6 +1051,7 @@ class GatewayChatClient {
     required String message,
     required String sessionId,
     String? model,
+    String? provider,
     List<Map<String, dynamic>>? history,
     String? imageDataUrl,
     required void Function(String token) onToken,
@@ -1068,6 +1067,7 @@ class GatewayChatClient {
 
     final body = {
       'model': model ?? 'hermes-agent',
+      if (provider?.trim().isNotEmpty == true) 'provider': provider!.trim(),
       'messages': messages,
       'stream': true,
     };
