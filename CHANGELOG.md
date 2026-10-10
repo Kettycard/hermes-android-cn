@@ -4,6 +4,20 @@ All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Release notes for
 versions prior to 1.0.7 are in the **What's new** sections of the [README](README.md).
 
+## [2.1.17] - 2026-10-11
+
+### Fixed
+
+- The model picker now works on API-server-only connections over port `8642`
+  without requiring the Desktop Dashboard on port `9119`. The selected provider
+  and model are applied to subsequent chat turns while preserving the current
+  session and normal automatic chat titles (#129, PR #138).
+
+### Thanks
+
+- @HorCyChangGenitek for the detailed API-only reproduction that identified the
+  model picker's unintended Dashboard dependency (#129).
+
 ## [2.1.16] - 2026-10-10
 
 ### Fixed

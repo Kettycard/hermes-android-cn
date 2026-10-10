@@ -1,4 +1,4 @@
-# Hermes Android — v2.1.16
+# Hermes Android — v2.1.17
 
 Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — chat with your Hermes sessions from a phone or tablet over local Wi-Fi or a private Tailscale network.
 
@@ -14,7 +14,7 @@ Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — ch
 
 ## Current release
 
-- Version: **2.1.16** (build 2156)
+- Version: **2.1.17** (build 2157)
 - Package: `com.hermesagent.hermes_android`
 - Recommended APK for modern phones: ARM64 release build from the
   [Releases](https://github.com/rusty4444/hermes-android/releases) page.
@@ -54,9 +54,16 @@ while Android is backgrounded, the app re-syncs that session's server-side
 history on resume. The durable exactly-once recovery path activates only when a
 gateway explicitly advertises the compatible recovery contract.
 
-See [CHANGELOG.md](CHANGELOG.md) for the complete `.16` change list and
+See [CHANGELOG.md](CHANGELOG.md) for the complete `.17` change list and
 [docs/HERMESAPK_DEVELOPMENT_LOG.md](docs/HERMESAPK_DEVELOPMENT_LOG.md) for the
 sanitized implementation and validation record.
+
+## What's new in v2.1.17
+
+- **Model selection on API-only connections** — choose and apply a provider and
+  model over port `8642` without enabling the Desktop Dashboard on port `9119`.
+  The choice stays attached to the same chat and new chats retain automatic
+  titles.
 
 ## What's new in v2.1.16
 
@@ -610,7 +617,7 @@ cp build/app/outputs/flutter-apk/app-*-release.apk release-apks/
 block in `android/app/build.gradle.kts` derives per-ABI codes as
 `base * 10 + ABI code` (armeabi-v7a = 1, arm64-v8a = 2, x86_64 = 3), so the
 codes stay ordered armeabi-v7a < arm64-v8a < x86_64 as fdroiddata requires.
-For v2.1.16, base `2156` therefore produces codes `21561`/`21562`/`21563`.
+For v2.1.17, base `2157` therefore produces codes `21571`/`21572`/`21573`.
 CI reads the completed arm64 APK with `aapt` and fails if that relationship
 drifts. Release-floor checks continue to apply to the base value and must not
 be weakened to rely on the ABI code.
@@ -721,6 +728,9 @@ lib/
 
 ## Credits
 
+- **HorCyChangGenitek** — reported and documented the API-only model-picker
+  failure that incorrectly required the Desktop Dashboard on port `9119`
+  (#129). Fixed in v2.1.17.
 - **maebahesioru** — corrected Gateway session liveness handling with focused
   regressions in PR #121 (v2.1.9), added complete Flutter localisation and
   on-device Japanese QA in PR #115 (v2.1.11), then added Android per-app locale
