@@ -4184,57 +4184,61 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           constraints: BoxConstraints(
             maxWidth: Responsive.isTablet(context) ? 800 : double.infinity,
           ),
-          child: LayoutBuilder(
-            builder: (context, viewport) => Column(
-              children: [
-                for (final notification in _gatewayNotifications.values)
-                  _buildGatewayNotification(notification),
-                if (_legacyTransportFallback)
-                  Container(
-                    key: const ValueKey('legacy-transport-notice'),
-                    width: double.infinity,
-                    color: Theme.of(context).colorScheme.tertiaryContainer,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    child: Text(
-                      _stockGatewayFallback
-                          ? context
-                                .l10n
-                                .this_server_doesn_t_offer_background_recovery_chats_run_live
-                          : context
-                                .l10n
-                                .background_recovery_unavailable_legacy_transport,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onTertiaryContainer,
-                        fontWeight: FontWeight.w600,
-                      ),
+          child: Column(
+            children: [
+              for (final notification in _gatewayNotifications.values)
+                _buildGatewayNotification(notification),
+              if (_legacyTransportFallback)
+                Container(
+                  key: const ValueKey('legacy-transport-notice'),
+                  width: double.infinity,
+                  color: Theme.of(context).colorScheme.tertiaryContainer,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  child: Text(
+                    _stockGatewayFallback
+                        ? context
+                              .l10n
+                              .this_server_doesn_t_offer_background_recovery_chats_run_live
+                        : context
+                              .l10n
+                              .background_recovery_unavailable_legacy_transport,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onTertiaryContainer,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                Expanded(
-                  child: Stack(
+                ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, viewport) => Column(
                     children: [
-                      Positioned.fill(child: _buildBody()),
-                      if (_endAffordanceController.isVisible)
-                        Positioned(
-                          right: 12,
-                          bottom: 12,
-                          child: ChatEndAffordance(
-                            newMessageCount:
-                                _endAffordanceController.newMessageCount,
-                            onPressed: _goToEnd,
-                          ),
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            Positioned.fill(child: _buildBody()),
+                            if (_endAffordanceController.isVisible)
+                              Positioned(
+                                right: 12,
+                                bottom: 12,
+                                child: ChatEndAffordance(
+                                  newMessageCount:
+                                      _endAffordanceController.newMessageCount,
+                                  onPressed: _goToEnd,
+                                ),
+                              ),
+                          ],
                         ),
+                      ),
+                      _buildInputBar(availableHeight: viewport.maxHeight),
                     ],
                   ),
                 ),
-                _buildInputBar(availableHeight: viewport.maxHeight),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -4266,10 +4270,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildInputBar({required double availableHeight}) {
+    const minimumControlsHeight = 56.0;
+    final composerMaxHeight = availableHeight <= minimumControlsHeight
+        ? availableHeight
+        : (availableHeight * 0.85)
+              .clamp(minimumControlsHeight, availableHeight)
+              .toDouble();
     return Container(
       key: const Key('chat-input-bar'),
-      // Leave some transcript visible; extras scroll before the editor moves.
-      constraints: BoxConstraints(maxHeight: availableHeight * 0.85),
+      // Leave some transcript visible when space permits. At very small
+      // heights, the fixed controls take priority and extras scroll away.
+      constraints: BoxConstraints(maxHeight: composerMaxHeight),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,

@@ -9,12 +9,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hermes_android/core/models/attachment_draft.dart';
 import 'package:hermes_android/core/screens/chat_screen.dart';
 import 'package:hermes_android/core/services/connection_manager.dart';
+import 'package:hermes_android/core/services/ws_client.dart';
 import 'package:hermes_android/core/widgets/attachment_draft_tile.dart';
 import 'package:hermes_android/l10n/app_localizations.dart';
 
 import 'support/fake_voice_composer_adapter.dart';
 
-Future<void> _pumpChat(WidgetTester tester, double textScale) async {
+Future<void> _pumpChat(
+  WidgetTester tester,
+  double textScale, {
+  TestDesktopAsyncEventHook? asyncHook,
+  bool withAttachmentDrafts = true,
+}) async {
   SharedPreferences.setMockInitialValues({'verbose_mode': false});
   const picker = MethodChannel('plugins.flutter.io/image_picker');
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -51,21 +57,24 @@ Future<void> _pumpChat(WidgetTester tester, double textScale) async {
           preview: '',
           startedAt: 1,
         ),
-        initialAttachmentDrafts: List.generate(
-          2,
-          (index) => AttachmentDraft(
-            id: 'photo-$index',
-            cachedPath: '/fixture/photo-$index.png',
-            name: 'photo-$index.png',
-            byteLength: 100,
-            mediaType: 'image/png',
-            kind: AttachmentDraftKind.image,
-            sanitized: true,
-            // Uploaded fixtures need no filesystem access or image decoding.
-            status: AttachmentDraftStatus.attached,
-          ),
-        ),
+        initialAttachmentDrafts: withAttachmentDrafts
+            ? List.generate(
+                2,
+                (index) => AttachmentDraft(
+                  id: 'photo-$index',
+                  cachedPath: '/fixture/photo-$index.png',
+                  name: 'photo-$index.png',
+                  byteLength: 100,
+                  mediaType: 'image/png',
+                  kind: AttachmentDraftKind.image,
+                  sanitized: true,
+                  // Uploaded fixtures need no filesystem access or image decoding.
+                  status: AttachmentDraftStatus.attached,
+                ),
+              )
+            : const [],
         testVoiceComposerAdapter: FakeVoiceComposerAdapter(),
+        testDesktopAsyncEventHook: asyncHook,
         testApiClient: ApiClient(
           baseUrl: 'https://fixture.invalid',
           apiKey: '',
@@ -173,4 +182,59 @@ void main() {
       await tester.pump();
     });
   }
+
+  testWidgets('gateway notices leave the composer above the IME', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(860, 412);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final asyncHook = TestDesktopAsyncEventHook();
+    await _pumpChat(tester, 1, asyncHook: asyncHook);
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 180);
+    await tester.enterText(
+      find.byKey(const Key('chat-message-composer')),
+      List.generate(13, (index) => 'Caption line ${index + 1}').join('\n'),
+    );
+    asyncHook.handler?.call(
+      StreamEvent(
+        type: 'notification.show',
+        data: const {
+          'key': 'composer-layout',
+          'level': 'warn',
+          'text': 'A gateway notice that must not cover the composer.',
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('A gateway notice that must not cover the composer.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.getRect(find.byTooltip('Send')).bottom,
+      lessThanOrEqualTo(232),
+    );
+  });
+
+  testWidgets('tiny IME viewport yields transcript space to controls', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(860, 360);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await _pumpChat(tester, 1, withAttachmentDrafts: false);
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.getRect(find.byTooltip('Send')).bottom,
+      lessThanOrEqualTo(160),
+    );
+  });
 }
