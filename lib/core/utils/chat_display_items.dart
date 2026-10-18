@@ -10,6 +10,20 @@ class ChatReasoningItem {
   const ChatReasoningItem(this.text, this.initiallyExpanded);
 }
 
+/// Consecutive tool activities rendered as a single activity card.
+///
+/// [id] names the group rather than the slot it happens to occupy, and the
+/// projection derives it the same way every time it runs — including while the
+/// group is still growing. Callers can therefore hang per-group UI state (a
+/// card the user collapsed) off it and keep it across list reordering and
+/// lazy-list eviction, which a position-bound widget State cannot do.
+class ChatToolActivityGroup {
+  const ChatToolActivityGroup({required this.id, required this.activities});
+
+  final String id;
+  final List<GatewayToolActivity> activities;
+}
+
 /// Project a raw Hermes message list into the heterogeneous list the chat
 /// screen renders.
 ///
@@ -19,7 +33,7 @@ class ChatReasoningItem {
 /// - `Map<String, dynamic>` — a user or assistant bubble, carrying
 ///   `_display_content` (tool-result blocks stripped) and, for assistant
 ///   replies, `_retry_prompt` with the user prompt that caused it;
-/// - `List<GatewayToolActivity>` — consecutive tool results collapsed into one
+/// - [ChatToolActivityGroup] — consecutive tool results collapsed into one
 ///   activity card;
 /// - [ChatReasoningItem] — assistant reasoning, emitted before its bubble;
 /// - `GatewaySubagentActivity` list and [GatewayNotice] — appended last.
@@ -38,11 +52,28 @@ List<dynamic> buildChatDisplayItems({
   final toolQueue = List<GatewayToolActivity>.from(toolActivities);
   final displayItems = <dynamic>[];
   final currentGroup = <GatewayToolActivity>[];
+  final groupOccurrences = <String, int>{};
   String? lastUserPrompt;
+
+  /// The first activity of a group never changes as the group grows, so its
+  /// identity seeds the group id; a repeat of the same seed in one projection
+  /// (same tool name, no id) is disambiguated by its occurrence.
+  String groupIdFor(List<GatewayToolActivity> group) {
+    final first = group.first;
+    final seed = first.toolId ?? first.name;
+    final occurrence = groupOccurrences[seed] ?? 0;
+    groupOccurrences[seed] = occurrence + 1;
+    return occurrence == 0 ? seed : '$seed#$occurrence';
+  }
 
   void flushToolGroup() {
     if (currentGroup.isEmpty) return;
-    displayItems.add(currentGroup.toList());
+    displayItems.add(
+      ChatToolActivityGroup(
+        id: groupIdFor(currentGroup),
+        activities: currentGroup.toList(),
+      ),
+    );
     currentGroup.clear();
   }
 
@@ -85,7 +116,14 @@ List<dynamic> buildChatDisplayItems({
 
   // Tools from gateway events that arrived during streaming but were never
   // matched to a stored message — show them as a trailing card.
-  if (toolQueue.isNotEmpty) displayItems.add(toolQueue.toList());
+  if (toolQueue.isNotEmpty) {
+    displayItems.add(
+      ChatToolActivityGroup(
+        id: groupIdFor(toolQueue),
+        activities: toolQueue.toList(),
+      ),
+    );
+  }
   if (subagentActivities.isNotEmpty) {
     displayItems.add(List<GatewaySubagentActivity>.from(subagentActivities));
   }
