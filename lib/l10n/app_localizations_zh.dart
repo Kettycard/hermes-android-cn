@@ -2402,6 +2402,36 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get couldn_t_check_for_updates => '无法检查更新。';
+
+  @override
+  String get chat_density => '聊天密度';
+
+  @override
+  String chat_density_2(Object label) {
+    return '聊天密度：$label';
+  }
+
+  @override
+  String get chat_density_comfortable => '舒适';
+
+  @override
+  String get chat_density_compact => '紧凑';
+
+  @override
+  String get chat_density_comfortable_description => '每条消息上方带有发送者标签的更宽松气泡。';
+
+  @override
+  String get chat_density_compact_description => '更紧凑的无标签气泡，屏幕上可以显示更多消息。';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      '紧凑模式会去掉 You 和 Hermes 标签，并缩小气泡内边距、间距和两侧边距。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -4796,4 +4826,34 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get couldn_t_check_for_updates => '无法检查更新。';
+
+  @override
+  String get chat_density => '聊天密度';
+
+  @override
+  String chat_density_2(Object label) {
+    return '聊天密度：$label';
+  }
+
+  @override
+  String get chat_density_comfortable => '舒适';
+
+  @override
+  String get chat_density_compact => '紧凑';
+
+  @override
+  String get chat_density_comfortable_description => '每条消息上方带有发送者标签的更宽松气泡。';
+
+  @override
+  String get chat_density_compact_description => '更紧凑的无标签气泡，屏幕上可以显示更多消息。';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      '紧凑模式会去掉 You 和 Hermes 标签，并缩小气泡内边距、间距和两侧边距。';
 }

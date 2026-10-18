@@ -10,6 +10,7 @@ import '../services/connection_manager.dart';
 import '../services/notification_prefs.dart';
 import '../services/turn_notification_service.dart';
 import '../widgets/config_backup_card.dart';
+import '../widgets/chat_density_settings_card.dart';
 import '../widgets/text_size_settings_card.dart';
 import '../../main.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -369,6 +370,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onChanged: (preference) => context
               .findAncestorStateOfType<HermesAppState>()!
               .setTextSizePreference(preference),
+        ),
+        const SizedBox(height: 8),
+        ChatDensitySettingsCard(
+          preferences: context
+              .findAncestorStateOfType<HermesAppState>()!
+              .widget
+              .connManager
+              .prefs,
         ),
         const SizedBox(height: 8),
         _VerboseToggle(),

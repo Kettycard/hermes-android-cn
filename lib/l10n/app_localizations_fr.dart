@@ -2491,4 +2491,36 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get couldn_t_check_for_updates =>
       'Impossible de rechercher des mises à jour.';
+
+  @override
+  String get chat_density => 'Densité de la conversation';
+
+  @override
+  String chat_density_2(Object label) {
+    return 'Densité de la conversation : $label';
+  }
+
+  @override
+  String get chat_density_comfortable => 'Confortable';
+
+  @override
+  String get chat_density_compact => 'Compacte';
+
+  @override
+  String get chat_density_comfortable_description =>
+      'Bulles plus spacieuses avec une étiquette d’expéditeur au-dessus de chaque message.';
+
+  @override
+  String get chat_density_compact_description =>
+      'Bulles plus serrées et sans étiquette pour afficher plus de messages à l’écran.';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      'Le mode compacte supprime les étiquettes « You » et « Hermes » et réduit les marges internes, l’espacement et les marges latérales des bulles.';
 }

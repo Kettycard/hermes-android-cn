@@ -58,6 +58,7 @@ class ConfigBackupService {
     'voice_name',
     'voice_locale',
     'app_text_size_preference',
+    'chat_density',
     AppUpdateService.checkOnLaunchKey,
     AppUpdateService.skippedVersionKey,
   };

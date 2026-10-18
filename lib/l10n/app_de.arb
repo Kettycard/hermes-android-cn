@@ -676,5 +676,13 @@
   "check_for_updates": "Nach Updates suchen",
   "check_for_updates_on_launch": "Beim Start nach Updates suchen",
   "you_re_on_the_latest_version": "Du hast bereits die neueste Version.",
-  "couldn_t_check_for_updates": "Updates konnten nicht geprüft werden."
+  "couldn_t_check_for_updates": "Updates konnten nicht geprüft werden.",
+  "chat_density": "Chat-Dichte",
+  "chat_density_2": "Chat-Dichte: {label}",
+  "chat_density_comfortable": "Komfortabel",
+  "chat_density_compact": "Kompakt",
+  "chat_density_comfortable_description": "Geräumigere Blasen mit Absenderbeschriftung über jeder Nachricht.",
+  "chat_density_compact_description": "Engere Blasen ohne Beschriftung, damit mehr Nachrichten auf den Bildschirm passen.",
+  "chat_density_label_description": "{label} — {description}",
+  "compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins": "Kompakt entfernt die Beschriftungen „You“ und „Hermes“ und verringert Blasenabstand, Abstände und Seitenränder."
 }

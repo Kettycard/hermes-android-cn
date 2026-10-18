@@ -2467,4 +2467,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get couldn_t_check_for_updates => 'Couldn’t check for updates.';
+
+  @override
+  String get chat_density => 'Chat density';
+
+  @override
+  String chat_density_2(Object label) {
+    return 'Chat density: $label';
+  }
+
+  @override
+  String get chat_density_comfortable => 'Comfortable';
+
+  @override
+  String get chat_density_compact => 'Compact';
+
+  @override
+  String get chat_density_comfortable_description =>
+      'Roomier bubbles with a sender label above each message.';
+
+  @override
+  String get chat_density_compact_description =>
+      'Tighter, unlabelled bubbles so more messages fit on screen.';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      'Compact removes the You and Hermes labels and trims bubble padding, spacing, and side margins.';
 }

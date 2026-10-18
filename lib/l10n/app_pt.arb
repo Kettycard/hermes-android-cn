@@ -676,5 +676,13 @@
   "check_for_updates": "Procurar atualizações",
   "check_for_updates_on_launch": "Procurar atualizações ao iniciar",
   "you_re_on_the_latest_version": "Já tem a versão mais recente.",
-  "couldn_t_check_for_updates": "Não foi possível procurar atualizações."
+  "couldn_t_check_for_updates": "Não foi possível procurar atualizações.",
+  "chat_density": "Densidade do chat",
+  "chat_density_2": "Densidade do chat: {label}",
+  "chat_density_comfortable": "Confortável",
+  "chat_density_compact": "Compacta",
+  "chat_density_comfortable_description": "Balões mais amplos com um rótulo de remetente acima de cada mensagem.",
+  "chat_density_compact_description": "Balões mais justos e sem rótulo para caberem mais mensagens no ecrã.",
+  "chat_density_label_description": "{label} — {description}",
+  "compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins": "O modo compacto remove os rótulos You e Hermes e reduz as margens internas, o espaçamento e as margens laterais dos balões."
 }

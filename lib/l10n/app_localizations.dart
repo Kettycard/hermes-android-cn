@@ -4208,6 +4208,55 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn’t check for updates.'**
   String get couldn_t_check_for_updates;
+
+  /// No description provided for @chat_density.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat density'**
+  String get chat_density;
+
+  /// No description provided for @chat_density_2.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat density: {label}'**
+  String chat_density_2(Object label);
+
+  /// No description provided for @chat_density_comfortable.
+  ///
+  /// In en, this message translates to:
+  /// **'Comfortable'**
+  String get chat_density_comfortable;
+
+  /// No description provided for @chat_density_compact.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact'**
+  String get chat_density_compact;
+
+  /// No description provided for @chat_density_comfortable_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Roomier bubbles with a sender label above each message.'**
+  String get chat_density_comfortable_description;
+
+  /// No description provided for @chat_density_compact_description.
+  ///
+  /// In en, this message translates to:
+  /// **'Tighter, unlabelled bubbles so more messages fit on screen.'**
+  String get chat_density_compact_description;
+
+  /// No description provided for @chat_density_label_description.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} — {description}'**
+  String chat_density_label_description(Object description, Object label);
+
+  /// No description provided for @compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact removes the You and Hermes labels and trims bubble padding, spacing, and side margins.'**
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins;
 }
 
 class _AppLocalizationsDelegate
