@@ -678,5 +678,13 @@
   "check_for_updates": "Check for updates",
   "check_for_updates_on_launch": "Check for updates on launch",
   "you_re_on_the_latest_version": "You’re on the latest version.",
-  "couldn_t_check_for_updates": "Couldn’t check for updates."
+  "couldn_t_check_for_updates": "Couldn’t check for updates.",
+  "chat_density": "Chat density",
+  "chat_density_2": "Chat density: {label}",
+  "chat_density_comfortable": "Comfortable",
+  "chat_density_compact": "Compact",
+  "chat_density_comfortable_description": "Roomier bubbles with a sender label above each message.",
+  "chat_density_compact_description": "Tighter, unlabelled bubbles so more messages fit on screen.",
+  "chat_density_label_description": "{label} — {description}",
+  "compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins": "Compact removes the You and Hermes labels and trims bubble padding, spacing, and side margins."
 }

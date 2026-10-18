@@ -2420,4 +2420,36 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get couldn_t_check_for_updates => 'アップデートを確認できませんでした。';
+
+  @override
+  String get chat_density => 'チャットの密度';
+
+  @override
+  String chat_density_2(Object label) {
+    return 'チャットの密度: $label';
+  }
+
+  @override
+  String get chat_density_comfortable => 'ゆったり';
+
+  @override
+  String get chat_density_compact => 'コンパクト';
+
+  @override
+  String get chat_density_comfortable_description =>
+      '各メッセージの上に送信者ラベルが付いた、ゆったりとした吹き出し。';
+
+  @override
+  String get chat_density_compact_description =>
+      'ラベルなしの詰まった吹き出しで、より多くのメッセージを表示します。';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      'コンパクトでは「You」「Hermes」のラベルを外し、吹き出しの余白・間隔・左右のマージンを詰めます。';
 }

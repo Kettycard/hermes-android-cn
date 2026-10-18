@@ -2485,4 +2485,36 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get couldn_t_check_for_updates =>
       'No se pudieron buscar actualizaciones.';
+
+  @override
+  String get chat_density => 'Densidad del chat';
+
+  @override
+  String chat_density_2(Object label) {
+    return 'Densidad del chat: $label';
+  }
+
+  @override
+  String get chat_density_comfortable => 'Cómoda';
+
+  @override
+  String get chat_density_compact => 'Compacta';
+
+  @override
+  String get chat_density_comfortable_description =>
+      'Burbujas más amplias con una etiqueta de remitente sobre cada mensaje.';
+
+  @override
+  String get chat_density_compact_description =>
+      'Burbujas más ajustadas y sin etiqueta para que quepan más mensajes en pantalla.';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      'Compacta quita las etiquetas «You» y «Hermes» y reduce el relleno, el espaciado y los márgenes laterales de las burbujas.';
 }

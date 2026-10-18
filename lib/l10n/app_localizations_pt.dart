@@ -2485,6 +2485,38 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get couldn_t_check_for_updates =>
       'Não foi possível procurar atualizações.';
+
+  @override
+  String get chat_density => 'Densidade do chat';
+
+  @override
+  String chat_density_2(Object label) {
+    return 'Densidade do chat: $label';
+  }
+
+  @override
+  String get chat_density_comfortable => 'Confortável';
+
+  @override
+  String get chat_density_compact => 'Compacta';
+
+  @override
+  String get chat_density_comfortable_description =>
+      'Balões mais amplos com um rótulo de remetente acima de cada mensagem.';
+
+  @override
+  String get chat_density_compact_description =>
+      'Balões mais justos e sem rótulo para caberem mais mensagens no ecrã.';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      'O modo compacto remove os rótulos You e Hermes e reduz as margens internas, o espaçamento e as margens laterais dos balões.';
 }
 
 /// The translations for Portuguese, as used in Brazil (`pt_BR`).
@@ -4963,4 +4995,36 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get couldn_t_check_for_updates =>
       'Não foi possível verificar atualizações.';
+
+  @override
+  String get chat_density => 'Densidade do chat';
+
+  @override
+  String chat_density_2(Object label) {
+    return 'Densidade do chat: $label';
+  }
+
+  @override
+  String get chat_density_comfortable => 'Confortável';
+
+  @override
+  String get chat_density_compact => 'Compacta';
+
+  @override
+  String get chat_density_comfortable_description =>
+      'Balões mais amplos com um rótulo de remetente acima de cada mensagem.';
+
+  @override
+  String get chat_density_compact_description =>
+      'Balões mais justos e sem rótulo para caberem mais mensagens na tela.';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      'O modo compacto remove os rótulos You e Hermes e reduz as margens internas, o espaçamento e as margens laterais dos balões.';
 }

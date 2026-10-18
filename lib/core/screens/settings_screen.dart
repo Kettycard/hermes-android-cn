@@ -10,6 +10,7 @@ import '../services/connection_manager.dart';
 import '../services/notification_prefs.dart';
 import '../services/turn_notification_service.dart';
 import '../widgets/config_backup_card.dart';
+import '../widgets/chat_density_settings_card.dart';
 import '../widgets/text_size_settings_card.dart';
 import '../../main.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -170,14 +171,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildChatDensityCard() => ChatDensitySettingsCard(
+    preferences: context
+        .findAncestorStateOfType<HermesAppState>()!
+        .widget
+        .connManager
+        .prefs,
+  );
+
   Widget _buildBody() {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
 
     if (_error != null && _modelOptions == null) {
-      // Update preferences and the About card are device-local. Keep them
-      // reachable even when the separate Hermes dashboard cannot answer.
+      // Device-local controls remain available without the dashboard.
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -212,6 +220,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          _buildSectionHeader(context.l10n.appearance),
+          _buildChatDensityCard(),
           const SizedBox(height: 16),
           _buildSectionHeader(context.l10n.about),
           _AboutCard(),
@@ -370,6 +381,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               .findAncestorStateOfType<HermesAppState>()!
               .setTextSizePreference(preference),
         ),
+        const SizedBox(height: 8),
+        _buildChatDensityCard(),
         const SizedBox(height: 8),
         _VerboseToggle(),
         const SizedBox(height: 16),

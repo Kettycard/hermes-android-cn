@@ -676,5 +676,13 @@
   "check_for_updates": "업데이트 확인",
   "check_for_updates_on_launch": "시작할 때 업데이트 확인",
   "you_re_on_the_latest_version": "이미 최신 버전입니다.",
-  "couldn_t_check_for_updates": "업데이트를 확인할 수 없습니다."
+  "couldn_t_check_for_updates": "업데이트를 확인할 수 없습니다.",
+  "chat_density": "채팅 밀도",
+  "chat_density_2": "채팅 밀도: {label}",
+  "chat_density_comfortable": "여유",
+  "chat_density_compact": "컴팩트",
+  "chat_density_comfortable_description": "각 메시지 위에 발신자 라벨이 있는 넉넉한 말풍선.",
+  "chat_density_compact_description": "라벨이 없는 촘촘한 말풍선으로 더 많은 메시지를 볼 수 있습니다.",
+  "chat_density_label_description": "{label} — {description}",
+  "compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins": "컴팩트는 You 및 Hermes 라벨을 없애고 말풍선 여백, 간격, 좌우 여백을 줄입니다."
 }

@@ -2421,4 +2421,36 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get couldn_t_check_for_updates => '업데이트를 확인할 수 없습니다.';
+
+  @override
+  String get chat_density => '채팅 밀도';
+
+  @override
+  String chat_density_2(Object label) {
+    return '채팅 밀도: $label';
+  }
+
+  @override
+  String get chat_density_comfortable => '여유';
+
+  @override
+  String get chat_density_compact => '컴팩트';
+
+  @override
+  String get chat_density_comfortable_description =>
+      '각 메시지 위에 발신자 라벨이 있는 넉넉한 말풍선.';
+
+  @override
+  String get chat_density_compact_description =>
+      '라벨이 없는 촘촘한 말풍선으로 더 많은 메시지를 볼 수 있습니다.';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      '컴팩트는 You 및 Hermes 라벨을 없애고 말풍선 여백, 간격, 좌우 여백을 줄입니다.';
 }
