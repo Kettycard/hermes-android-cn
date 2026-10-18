@@ -162,6 +162,9 @@ List<MapEntry<ChatDateBucket, List<Session>>> groupChatsByDate(
 
 class WorkspaceSessionsData {
   final List<Session> sessions;
+
+  /// A provisional list while a complete scan or additive metadata loads.
+  final bool isPartial;
   final Set<String> claimedSessionIds;
   final Set<String> archivedQuickChatIds;
 
@@ -186,6 +189,7 @@ class WorkspaceSessionsData {
 
   const WorkspaceSessionsData({
     this.sessions = const [],
+    this.isPartial = false,
     this.claimedSessionIds = const {},
     this.archivedQuickChatIds = const {},
     this.archivedSessions = const [],
@@ -249,6 +253,7 @@ class WorkspaceSessionsScreen extends StatefulWidget {
   final String title;
   final WorkspaceSessionView view;
   final WorkspaceSessionsLoader load;
+  final WorkspaceSessionsData? initialData;
   final ValueChanged<Session> onOpenSession;
   final WorkspaceSessionPromoter? onPromote;
   final LocalChatPinStore? pinStore;
@@ -267,6 +272,7 @@ class WorkspaceSessionsScreen extends StatefulWidget {
     required this.title,
     required this.view,
     required this.load,
+    this.initialData,
     required this.onOpenSession,
     this.onPromote,
     this.pinStore,
@@ -315,8 +321,20 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen>
   @override
   void initState() {
     super.initState();
+    _data = widget.initialData;
     WidgetsBinding.instance.addObserver(this);
     unawaited(_load());
+  }
+
+  @override
+  void didUpdateWidget(covariant WorkspaceSessionsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Home can deliver its first five (or more human rows from the first
+    // background page) after Chats has already mounted. Never replace a
+    // completed metadata read with provisional data from a parent rebuild.
+    if ((_data == null || _data!.isPartial) && widget.initialData != null) {
+      _data = widget.initialData;
+    }
   }
 
   @override
@@ -407,6 +425,7 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen>
         setState(() {
           _data = WorkspaceSessionsData(
             sessions: data.sessions,
+            isPartial: data.isPartial,
             // The move claims the chat: add it to the claim set so the
             // Unassigned view drops the row immediately instead of
             // waiting for the next reload.
@@ -548,6 +567,31 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen>
           HermesSpacing.xl,
         ),
         children: [
+          if (data.isPartial)
+            Padding(
+              padding: const EdgeInsets.only(bottom: HermesSpacing.md),
+              child: _error == null
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(context.l10n.loading),
+                        const LinearProgressIndicator(),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            context.l10n.could_not_load_conversations,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => unawaited(_load()),
+                          child: Text(context.l10n.retry),
+                        ),
+                      ],
+                    ),
+            ),
           TextField(
             key: kWorkspaceSessionSearchKey,
             autofocus: widget.view == WorkspaceSessionView.search,
@@ -569,15 +613,15 @@ class _WorkspaceSessionsScreenState extends State<WorkspaceSessionsScreen>
             _buildChips(),
           ],
           const SizedBox(height: HermesSpacing.lg),
-          if (sessions.isEmpty)
+          if (sessions.isEmpty && !data.isPartial)
             EmptyState(
               icon: _emptyIcon,
               title: _query.isEmpty
                   ? context.l10n.nothing_here
                   : context.l10n.no_matches,
               message: _emptyMessage,
-            )
-          else ...[
+            ),
+          if (sessions.isNotEmpty) ...[
             if (pinnedSessions.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.only(

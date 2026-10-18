@@ -23,36 +23,103 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'package:hermes_android/core/l10n/l10n.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  final prefs = await SharedPreferences.getInstance();
-  ConnectionManager? connManager;
-  Object? startupError;
-  try {
-    connManager = await ConnectionManager.create(prefs);
-  } catch (error) {
-    // A corrupt saved-connections entry or a Keystore fault must not kill
-    // the app before any UI exists — reinstall-only failure. Surface a
-    // recovery screen instead so the user can reset the damaged store.
-    startupError = error;
+  runApp(const StartupApp());
+}
+
+/// Draws a Flutter frame before reading preferences or Android Keystore.
+/// The connection store must still finish migration and credential hydration
+/// before Home can access any saved connection.
+class StartupApp extends StatefulWidget {
+  const StartupApp({super.key, this.createConnectionManager});
+
+  /// The production path uses [ConnectionManager.create]; tests can hold a
+  /// real credential read pending without depending on the platform Keystore.
+  final Future<ConnectionManager> Function(SharedPreferences)?
+  createConnectionManager;
+
+  @override
+  State<StartupApp> createState() => _StartupAppState();
+}
+
+class _StartupAppState extends State<StartupApp> {
+  final _shareIntents = AndroidShareIntentService();
+  final _launchIntents = AndroidLaunchIntentService();
+  SharedPreferences? _prefs;
+  ConnectionManager? _connManager;
+  Object? _startupError;
+
+  Future<ConnectionManager> _createConnectionManager(SharedPreferences prefs) =>
+      widget.createConnectionManager?.call(prefs) ??
+      ConnectionManager.create(prefs);
+
+  @override
+  void initState() {
+    super.initState();
+    // A pending secure-store read must not keep the native splash on screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_initialize());
+    });
   }
-  final shareIntents = AndroidShareIntentService();
-  final launchIntents = AndroidLaunchIntentService();
-  await Future.wait([shareIntents.initialize(), launchIntents.initialize()]);
-  runApp(
-    connManager == null
-        ? _StartupRecoveryApp(
-            prefs: prefs,
-            error: startupError,
-            shareIntents: shareIntents,
-            launchIntents: launchIntents,
-          )
-        : HermesApp(
-            connManager: connManager,
-            shareIntents: shareIntents,
-            launchIntents: launchIntents,
-          ),
-  );
+
+  Future<void> _initialize() async {
+    late SharedPreferences prefs;
+    ConnectionManager? connManager;
+    Object? startupError;
+    // Preferences/Keystore and the two Android intent channels are
+    // independent. Start all three after the first frame, but do not mount
+    // Home until both the credential load and initial intents have finished.
+    await Future.wait<void>([
+      () async {
+        prefs = await SharedPreferences.getInstance();
+        try {
+          connManager = await _createConnectionManager(prefs);
+        } catch (error) {
+          // A corrupt connection entry or a Keystore fault must lead to the
+          // existing reset/retry screen, never to Home with unhydrated secrets.
+          startupError = error;
+        }
+      }(),
+      _shareIntents.initialize(),
+      _launchIntents.initialize(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _prefs = prefs;
+      _connManager = connManager;
+      _startupError = startupError;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = _prefs;
+    if (prefs != null) {
+      final connManager = _connManager;
+      if (connManager != null) {
+        return HermesApp(
+          connManager: connManager,
+          shareIntents: _shareIntents,
+          launchIntents: _launchIntents,
+        );
+      }
+      return _StartupRecoveryApp(
+        prefs: prefs,
+        error: _startupError,
+        createConnectionManager: _createConnectionManager,
+        onRecovered: (manager) {
+          if (mounted) setState(() => _connManager = manager);
+        },
+      );
+    }
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: hermesTheme(Brightness.light),
+      darkTheme: hermesTheme(Brightness.dark),
+      home: const Scaffold(body: Center(child: CircularProgressIndicator())),
+    );
+  }
 }
 
 /// Minimal recovery surface shown when the connection store could not be
@@ -64,24 +131,25 @@ class _StartupRecoveryApp extends StatelessWidget {
   const _StartupRecoveryApp({
     required this.prefs,
     required this.error,
-    required this.shareIntents,
-    required this.launchIntents,
+    required this.createConnectionManager,
+    required this.onRecovered,
   });
 
   final SharedPreferences prefs;
   final Object? error;
-  final AndroidShareIntentService shareIntents;
-  final AndroidLaunchIntentService launchIntents;
+  final Future<ConnectionManager> Function(SharedPreferences)
+  createConnectionManager;
+  final ValueChanged<ConnectionManager> onRecovered;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      key: _rootKey,
       debugShowCheckedModeBanner: false,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: preferredSupportedLocales(),
       localeListResolutionCallback: resolvePreferredLocale,
       home: Builder(
+        key: _rootKey,
         builder: (context) => Scaffold(
           body: Center(
             child: Padding(
@@ -108,16 +176,10 @@ class _StartupRecoveryApp extends StatelessWidget {
                   const SizedBox(height: 24),
                   FilledButton.icon(
                     onPressed: () async {
-                      await prefs.remove('saved_connections');
                       try {
-                        final retry = await ConnectionManager.create(prefs);
-                        runApp(
-                          HermesApp(
-                            connManager: retry,
-                            shareIntents: shareIntents,
-                            launchIntents: launchIntents,
-                          ),
-                        );
+                        await prefs.remove('saved_connections');
+                        final retry = await createConnectionManager(prefs);
+                        onRecovered(retry);
                       } catch (retryError) {
                         // Re-read the key after the await: the recovery
                         // screen may already have been replaced by the

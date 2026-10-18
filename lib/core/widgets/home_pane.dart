@@ -28,15 +28,24 @@ import '../utils/home_digest.dart';
 import 'hermes_components.dart';
 
 import 'package:hermes_android/core/l10n/l10n.dart';
+
 /// Reads the sessions Home ranks. Injectable so the pane can be tested — and
 /// later re-pointed at a cache — without reaching for a transport.
 typedef HomeSessionsLoader = Future<List<Session>> Function();
+
+/// Delivers a fast first slice, then replaces it with the complete scan.
+/// A null update means the background scan failed; the first slice stays.
+typedef HomeProgressiveSessionsLoader =
+    Future<List<Session>> Function(
+      void Function(List<Session>? sessions) onUpdate,
+    );
 
 /// Supplies "now". Injectable so window boundaries stay assertable.
 typedef HomeClock = DateTime Function();
 
 class HomePane extends StatefulWidget {
   final HomeSessionsLoader loadSessions;
+  final HomeProgressiveSessionsLoader? loadProgressiveSessions;
 
   /// Session id to the reason it is blocked.
   final Map<String, String> attention;
@@ -58,6 +67,7 @@ class HomePane extends StatefulWidget {
 
   const HomePane({
     required this.loadSessions,
+    this.loadProgressiveSessions,
     this.attention = const {},
     this.running = const {},
     this.archived = const {},
@@ -80,7 +90,15 @@ class HomePaneState extends State<HomePane> {
   /// stale-but-usable apart from nothing-to-show.
   Object? _error;
 
-  bool _loading = false;
+  bool _scanning = false;
+  bool _scanFailed = false;
+  int _generation = 0;
+
+  @override
+  void dispose() {
+    _generation++;
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -96,21 +114,43 @@ class HomePaneState extends State<HomePane> {
   Future<void> refresh() => _load();
 
   Future<void> _load() async {
-    if (_loading) return;
-    setState(() => _loading = true);
+    final generation = ++_generation;
+    setState(() {
+      _scanning = false;
+      _scanFailed = false;
+    });
     try {
-      final sessions = await widget.loadSessions();
-      if (!mounted) return;
+      final progressive = widget.loadProgressiveSessions;
+      final sessions = await (progressive == null
+          ? widget.loadSessions()
+          : progressive((updated) {
+              if (!mounted || generation != _generation) return;
+              setState(() {
+                _scanning = false;
+                _scanFailed = updated == null;
+                if (updated != null) _sessions = updated;
+              });
+            }));
+      if (!mounted || generation != _generation) return;
       setState(() {
-        _sessions = sessions;
+        // A refresh must not briefly erase older blocked/running rows while
+        // its first five are ready but the rest of the scan is still pending.
+        final previous = _sessions;
+        _sessions = progressive == null || previous == null
+            ? sessions
+            : [
+                ...sessions,
+                ...previous.where(
+                  (old) => !sessions.any((recent) => recent.id == old.id),
+                ),
+              ];
         _error = null;
-        _loading = false;
+        _scanning = progressive != null;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _error = error;
-        _loading = false;
       });
     }
   }
@@ -125,8 +165,9 @@ class HomePaneState extends State<HomePane> {
       if (_error != null) {
         return ErrorState(
           title: context.l10n.could_not_reach_hermes,
-          message:
-              context.l10n.home_needs_your_recent_chats_to_know_what_deserves_your,
+          message: context
+              .l10n
+              .home_needs_your_recent_chats_to_know_what_deserves_your,
           onRetry: _load,
         );
       }
@@ -145,6 +186,16 @@ class HomePaneState extends State<HomePane> {
       projectNames: widget.projectNames,
     );
 
+    if (digest.isEmpty && _scanFailed) {
+      return ErrorState(
+        title: context.l10n.could_not_reach_hermes,
+        message: context
+            .l10n
+            .home_needs_your_recent_chats_to_know_what_deserves_your,
+        onRetry: _load,
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
@@ -152,7 +203,23 @@ class HomePaneState extends State<HomePane> {
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           if (_error != null) const _OfflineBanner(),
-          if (digest.isEmpty)
+          if (_scanning)
+            Padding(
+              padding: const EdgeInsets.all(HermesSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(context.l10n.loading),
+                  const LinearProgressIndicator(),
+                ],
+              ),
+            ),
+          if (_scanFailed)
+            Padding(
+              padding: const EdgeInsets.all(HermesSpacing.lg),
+              child: Text(context.l10n.could_not_reach_hermes),
+            ),
+          if (digest.isEmpty && !_scanning)
             Padding(
               padding: EdgeInsets.only(
                 top: MediaQuery.sizeOf(context).height * 0.12,
@@ -160,11 +227,12 @@ class HomePaneState extends State<HomePane> {
               child: EmptyState(
                 icon: Icons.check_circle_outline,
                 title: context.l10n.nothing_needs_you,
-                message:
-                    context.l10n.no_chat_is_blocked_running_or_waiting_to_be_resumed,
+                message: context
+                    .l10n
+                    .no_chat_is_blocked_running_or_waiting_to_be_resumed,
               ),
-            )
-          else
+            ),
+          if (!digest.isEmpty)
             for (final section in digest.sections) ..._section(section),
         ],
       ),
