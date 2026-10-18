@@ -431,6 +431,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final List<_PendingClarifyPrompt> _clarifyPromptQueue = [];
   _PendingClarifyPrompt? _activeClarifyPrompt;
   bool _clarifyPromptRouteOpen = false;
+  Route<bool>? _clarifyPromptRoute;
+  bool _clarifyPromptClosing = false;
 
   /// Clarify prompts whose answer the user submitted from their own card.
   ///
@@ -3496,7 +3498,32 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// on top — the chat screen, or the next question's card — with it.
   bool _ownsClarifyPromptRoute(GatewayClarifyRequest request) {
     return _clarifyPromptRouteOpen &&
+        !_clarifyPromptClosing &&
         _activeClarifyPrompt?.request.identityKey == request.identityKey;
+  }
+
+  void _closeClarifyPromptRoute() {
+    if (_clarifyPromptClosing) return;
+    final route = _clarifyPromptRoute;
+    if (route == null) {
+      // showDialog pushed the route but its builder has not run yet.
+      // Wait for its identity rather than popping an unrelated top route.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _clarifyPromptRouteOpen && _clarifyPromptRoute != null) {
+          _closeClarifyPromptRoute();
+        }
+      });
+      return;
+    }
+    _clarifyPromptClosing = true;
+    final navigator = Navigator.of(context, rootNavigator: true);
+    if (route.isCurrent) {
+      navigator.pop(false);
+    } else {
+      // A newer approval may be above clarify. Expiring clarify must not
+      // dismiss that independent request or send an unintended denial.
+      navigator.removeRoute(route, false);
+    }
   }
 
   Future<void> _respondToGatewayClarify({
@@ -3807,7 +3834,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
       if (_activeClarifyPrompt?.request.requestId == requestId &&
           _clarifyPromptRouteOpen) {
-        Navigator.of(context, rootNavigator: true).pop(false);
+        _closeClarifyPromptRoute();
       } else if (_activeClarifyPrompt?.request.requestId != requestId) {
         _cancelledInteractiveRequestIds.remove(requestId);
       }
@@ -3846,7 +3873,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
     _cancelledInteractiveRequestIds.add(requestId);
     if (_clarifyPromptRouteOpen) {
-      Navigator.of(context, rootNavigator: true).pop(false);
+      _closeClarifyPromptRoute();
     } else {
       _activeClarifyPrompt = null;
       _cancelledInteractiveRequestIds.remove(requestId);
@@ -3912,13 +3939,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final responded = await showDialog<bool>(
         context: context,
         barrierDismissible: true,
-        builder: (_) => GatewayClarifyDialog(
-          request: pending.request,
-          onRespond: (answer) => _answerClarifyPrompt(pending.request, answer),
-          canCloseRoute: () => _ownsClarifyPromptRoute(pending.request),
-        ),
+        builder: (dialogContext) {
+          _clarifyPromptRoute = ModalRoute.of<bool>(dialogContext);
+          return GatewayClarifyDialog(
+            request: pending.request,
+            onRespond: (answer) =>
+                _answerClarifyPrompt(pending.request, answer),
+            canCloseRoute: () => _ownsClarifyPromptRoute(pending.request),
+          );
+        },
       );
       _clarifyPromptRouteOpen = false;
+      _clarifyPromptRoute = null;
+      _clarifyPromptClosing = false;
       _selfAnsweredClarifyIdentities.remove(pending.request.identityKey);
       final wasCancelled = _cancelledInteractiveRequestIds.remove(
         pending.request.requestId,

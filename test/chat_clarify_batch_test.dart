@@ -28,6 +28,7 @@ class _BatchClarifySession implements GatewayTurnApplicationSession {
   final Map<String, Set<String>> _open = {};
   final List<({String requestId, String? questionId, String answer})> answers =
       [];
+  final List<String> approvalAnswers = [];
   final Set<String> _expiredRequests = {};
   Completer<void>? _heldLock;
 
@@ -38,6 +39,8 @@ class _BatchClarifySession implements GatewayTurnApplicationSession {
   /// Leaves the next answer's `clarify.lock` in flight so a test can interleave
   /// a cancellation (and the gateway's late `status: expired` response) with it.
   void holdNextLock() => _heldLock = Completer<void>();
+
+  void releaseHeldLock() => _heldLock?.complete();
 
   /// Resolves a held lock the way `DesktopGatewayClient.respondToClarify` does
   /// when the lock comes back `status: expired`: the answered question is gone,
@@ -113,14 +116,17 @@ class _BatchClarifySession implements GatewayTurnApplicationSession {
   bool ownsApprovalRequest({
     required String sessionId,
     required String requestId,
-  }) => false;
+  }) => sessionId == _sessionId && requestId == 'approval-1';
 
   @override
   Future<bool> tryRespondToApproval({
     required String sessionId,
     required String choice,
     String? requestId,
-  }) async => false;
+  }) async {
+    approvalAnswers.add(choice);
+    return true;
+  }
 
   @override
   Future<bool> tryRespondToSudo({
@@ -293,7 +299,95 @@ void _deliverSingleQuestion(
   );
 }
 
+void _deliverApproval(TestDesktopAsyncEventHook hook) {
+  hook.handler?.call(
+    StreamEvent(
+      type: 'approval.request',
+      data: {
+        'server_request_id': 'approval-1',
+        'command': 'echo safe',
+        'description': 'Approve command?',
+        'choices': ['once', 'deny'],
+      },
+    ),
+  );
+}
+
 void main() {
+  testWidgets('cancelled clarify below approval leaves approval open', (
+    tester,
+  ) async {
+    final (session, hook) = await _pumpChat(tester);
+    session.openBatch('r1', ['q1', 'q2']);
+    _deliverBatchQuestion(hook);
+    await _pumpFrames(tester, const Duration(milliseconds: 200));
+    expect(find.text('First question?'), findsOneWidget);
+
+    _deliverApproval(hook);
+    await _pumpFrames(tester, const Duration(milliseconds: 200));
+    expect(find.text('Approve command?'), findsOneWidget);
+
+    _deliverRequestCancel(hook, 'r1');
+    await _pumpFrames(tester, const Duration(milliseconds: 300));
+    expect(find.text('First question?'), findsNothing);
+    expect(find.text('Second question?'), findsNothing);
+    expect(find.text('Approve command?'), findsOneWidget);
+    expect(session.answers, isEmpty);
+    expect(session.approvalAnswers, isEmpty);
+
+    await tester.tap(find.byKey(const Key('approval-once')));
+    await _pumpFrames(tester, const Duration(milliseconds: 300));
+    expect(session.approvalAnswers, ['once']);
+    expect(find.byType(ChatScreen), findsOneWidget);
+  });
+
+  testWidgets('clarify answer closes its own route below a newer approval', (
+    tester,
+  ) async {
+    final (session, hook) = await _pumpChat(tester);
+    session.openBatch('r1', ['q1', 'q2']);
+    _deliverBatchQuestion(hook);
+    await _pumpFrames(tester, const Duration(milliseconds: 200));
+    expect(find.text('First question?'), findsOneWidget);
+
+    session.holdNextLock();
+    await tester.tap(find.byKey(const Key('clarify-choice-1')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('clarify-continue')));
+    await _pumpFrames(tester);
+    expect(session.answers.single.questionId, 'q1');
+
+    // The gateway can ask for an approval while clarify.lock is outstanding.
+    _deliverApproval(hook);
+    await _pumpFrames(tester, const Duration(milliseconds: 200));
+    expect(find.text('Approve command?'), findsOneWidget);
+    expect(find.text('First question?'), findsOneWidget);
+
+    // The lock emits clarify.remaining before its response future returns.
+    // Only the older clarify route may close, not approval.
+    session.releaseHeldLock();
+    await _pumpFrames(tester, const Duration(milliseconds: 300));
+    expect(find.text('Approve command?'), findsOneWidget);
+    expect(find.text('First question?'), findsNothing);
+    expect(find.byType(ChatScreen), findsOneWidget);
+    expect(session.approvalAnswers, isEmpty);
+
+    await tester.tap(find.byKey(const Key('approval-once')));
+    await _pumpFrames(tester, const Duration(milliseconds: 300));
+    expect(session.approvalAnswers, ['once']);
+    expect(find.text('Approve command?'), findsNothing);
+    expect(find.byType(ChatScreen), findsOneWidget);
+
+    // The outstanding second batch question can still be answered.
+    expect(find.text('Second question?'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('clarify-choice-0')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('clarify-continue')));
+    await _pumpFrames(tester, const Duration(milliseconds: 200));
+    expect(session.answers.last.questionId, 'q2');
+    expect(find.byType(ChatScreen), findsOneWidget);
+  });
+
   testWidgets('answers every question of a batch clarify request', (
     tester,
   ) async {
