@@ -11,16 +11,54 @@
 /// Keyed by the group id from `ChatToolActivityGroup`, the choice follows the
 /// group instead of the slot it occupies.
 class ToolActivityGroupPins {
+  static const maxPins = 100;
   final Map<String, bool> _pins = <String, bool>{};
+  final Map<String, String> _aliases = <String, String>{};
 
   /// The choice this user made for [groupId], or `null` if they never touched
   /// that card.
   bool? operator [](String groupId) => _pins[groupId];
 
-  void pin(String groupId, bool expanded) => _pins[groupId] = expanded;
+  void pin(String groupId, bool expanded) {
+    _pins.remove(groupId);
+    _pins[groupId] = expanded;
+    final alias = _aliases[groupId];
+    if (alias != null) _put(alias, expanded);
+    _trim();
+  }
+
+  /// Link an initially id-less activity to its later durable tool id. The
+  /// alias is retained so a tap after the merge also follows history refresh.
+  void alias(String groupId, String durableId) {
+    if (groupId == durableId) return;
+    _aliases.remove(groupId);
+    _aliases[groupId] = durableId;
+    final choice = _pins[groupId];
+    if (choice != null && !_pins.containsKey(durableId)) {
+      _put(durableId, choice);
+    }
+    _trim();
+  }
+
+  void _put(String id, bool expanded) {
+    _pins.remove(id);
+    _pins[id] = expanded;
+  }
+
+  void _trim() {
+    while (_pins.length > maxPins) {
+      _pins.remove(_pins.keys.first);
+    }
+    while (_aliases.length > maxPins) {
+      _aliases.remove(_aliases.keys.first);
+    }
+  }
 
   /// Forgets every choice, for when the conversation itself is replaced.
-  void clear() => _pins.clear();
+  void clear() {
+    _pins.clear();
+    _aliases.clear();
+  }
 
   int get length => _pins.length;
 }

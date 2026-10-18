@@ -13,8 +13,8 @@ class ChatReasoningItem {
 /// Consecutive tool activities rendered as a single activity card.
 ///
 /// [id] names the group rather than the slot it happens to occupy, and the
-/// projection derives it the same way every time it runs — including while the
-/// group is still growing. Callers can therefore hang per-group UI state (a
+/// first activity retains it across merges — including while the group is still
+/// growing. Callers can therefore hang per-group UI state (a
 /// card the user collapsed) off it and keep it across list reordering and
 /// lazy-list eviction, which a position-bound widget State cannot do.
 class ChatToolActivityGroup {
@@ -52,36 +52,38 @@ List<dynamic> buildChatDisplayItems({
   final toolQueue = List<GatewayToolActivity>.from(toolActivities);
   final displayItems = <dynamic>[];
   final currentGroup = <GatewayToolActivity>[];
-  final groupOccurrences = <String, int>{};
+  String? currentGroupId;
   String? lastUserPrompt;
-
-  /// The first activity of a group never changes as the group grows, so its
-  /// identity seeds the group id; a repeat of the same seed in one projection
-  /// (same tool name, no id) is disambiguated by its occurrence.
-  String groupIdFor(List<GatewayToolActivity> group) {
-    final first = group.first;
-    final seed = first.toolId ?? first.name;
-    final occurrence = groupOccurrences[seed] ?? 0;
-    groupOccurrences[seed] = occurrence + 1;
-    return occurrence == 0 ? seed : '$seed#$occurrence';
-  }
 
   void flushToolGroup() {
     if (currentGroup.isEmpty) return;
     displayItems.add(
       ChatToolActivityGroup(
-        id: groupIdFor(currentGroup),
+        id: currentGroupId ?? currentGroup.first.identity,
         activities: currentGroup.toList(),
       ),
     );
     currentGroup.clear();
+    currentGroupId = null;
   }
 
   for (final msg in messages) {
     final rawRole = (msg['role'] as String?) ?? 'assistant';
     final role = rawRole == 'agent' ? 'assistant' : rawRole;
     if (isToolResultMessage(msg)) {
-      if (toolQueue.isNotEmpty) currentGroup.add(toolQueue.removeAt(0));
+      if (toolQueue.isNotEmpty) {
+        final activity = toolQueue.removeAt(0);
+        if (currentGroup.isEmpty) {
+          // A stored row's id survives latest-history window shifts. If
+          // neither the activity nor the row has an id, its local identity
+          // is intentionally not shared with another same-name run.
+          final rowId = msg['id'] ?? msg['message_id'];
+          currentGroupId = rowId is num || rowId is String && rowId.isNotEmpty
+              ? 'message:$rowId'
+              : activity.identity;
+        }
+        currentGroup.add(activity);
+      }
       continue;
     }
     if (role != 'user' && role != 'assistant') continue;
@@ -119,7 +121,7 @@ List<dynamic> buildChatDisplayItems({
   if (toolQueue.isNotEmpty) {
     displayItems.add(
       ChatToolActivityGroup(
-        id: groupIdFor(toolQueue),
+        id: toolQueue.first.identity,
         activities: toolQueue.toList(),
       ),
     );

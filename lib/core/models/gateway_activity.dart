@@ -9,22 +9,33 @@ enum GatewayToolActivityPhase {
 class GatewayToolActivity {
   static const _maxNameLength = 120;
   static const _maxDetailLength = 500;
+  static int _nextLocalIdentity = 0;
 
   final String? toolId;
+
+  /// Stable across merge updates, even if the gateway supplies a tool id later.
+  /// Stored tool rows can also anchor the projected group to their message id.
+  /// Unanchored activities get a unique local id, not another run's name.
+  final String identity;
   final String name;
   final GatewayToolActivityPhase phase;
   final String? detail;
   final double? durationSeconds;
   final String? emoji;
 
-  const GatewayToolActivity({
+  GatewayToolActivity({
     required this.name,
     required this.phase,
     this.toolId,
+    String? identity,
     this.detail,
     this.durationSeconds,
     this.emoji,
-  });
+  }) : identity =
+           identity ??
+           (toolId != null && toolId.trim().isNotEmpty
+               ? 'tool:$toolId'
+               : 'local:${_nextLocalIdentity++}');
 
   bool get isTerminal =>
       phase == GatewayToolActivityPhase.completed ||
@@ -111,6 +122,7 @@ class GatewayToolActivity {
   GatewayToolActivity merge(GatewayToolActivity update) {
     return GatewayToolActivity(
       toolId: update.toolId ?? toolId,
+      identity: identity,
       name: update.name == 'tool' && name != 'tool' ? name : update.name,
       phase: update.phase,
       detail: update.detail ?? detail,

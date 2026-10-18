@@ -4080,7 +4080,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         );
       }
       if (idx >= 0) {
-        _toolActivities[idx] = _toolActivities[idx].merge(update);
+        final previous = _toolActivities[idx];
+        _toolActivities[idx] = previous.merge(update);
+        if (previous.toolId == null && update.toolId != null) {
+          _toolActivityPins.alias(previous.identity, 'tool:${update.toolId}');
+        }
       } else {
         _toolActivities.add(update);
       }
@@ -4642,6 +4646,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       verbose: _verboseMode,
     );
 
+    // The stored row is the durable anchor once available. Carry a pin made
+    // while this group was still streaming across the tool-id → row-id handoff.
+    for (final group in displayMessages.whereType<ChatToolActivityGroup>()) {
+      final toolId = group.activities.first.toolId;
+      if (group.id.startsWith('message:') &&
+          toolId != null &&
+          toolId.isNotEmpty) {
+        _toolActivityPins.alias('tool:$toolId', group.id);
+      }
+    }
+
     return NotificationListener<ScrollMetricsNotification>(
       onNotification: (notification) {
         _syncEndAffordance(notification.metrics, clearUnreadAtEnd: false);
@@ -4662,8 +4677,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 activities: item.activities,
                 verbose: _verboseMode,
                 pinnedExpansion: _toolActivityPins[item.id],
-                onPinChanged: (expanded) =>
-                    _toolActivityPins.pin(item.id, expanded),
+                onPinChanged: (expanded) {
+                  _toolActivityPins.pin(item.id, expanded);
+                  final toolId = item.activities.first.toolId;
+                  if (toolId != null && toolId.isNotEmpty) {
+                    _toolActivityPins.alias(item.id, 'tool:$toolId');
+                  }
+                },
               );
             }
             if (item is List<GatewaySubagentActivity>) {
