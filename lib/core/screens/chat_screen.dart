@@ -38,6 +38,7 @@ import '../models/gateway_insight.dart';
 import '../models/gateway_sensitive_prompt.dart';
 import '../models/gateway_turn_contract.dart';
 import '../models/projects_tree_overview.dart';
+import '../services/tool_activity_group_pins.dart';
 import '../utils/chat_display_items.dart';
 import '../utils/chat_history_scroll.dart';
 import '../utils/message_content.dart';
@@ -345,6 +346,10 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _messages = [];
   final List<GatewayToolActivity> _toolActivities = [];
+
+  /// Expansion choices for tool-activity cards, keyed by group id so they
+  /// survive the list reordering and row eviction that a streaming turn causes.
+  final ToolActivityGroupPins _toolActivityPins = ToolActivityGroupPins();
   final List<GatewaySubagentActivity> _subagentActivities = [];
   final Map<String, GatewayNotification> _gatewayNotifications = {};
   final Map<String, Timer> _notificationTimers = {};
@@ -4181,7 +4186,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         );
       }
       if (idx >= 0) {
-        _toolActivities[idx] = _toolActivities[idx].merge(update);
+        final previous = _toolActivities[idx];
+        _toolActivities[idx] = previous.merge(update);
+        if (previous.toolId == null && update.toolId != null) {
+          _toolActivityPins.alias(previous.identity, 'tool:${update.toolId}');
+        }
       } else {
         _toolActivities.add(update);
       }
@@ -4743,6 +4752,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       verbose: _verboseMode,
     );
 
+    // The stored row is the durable anchor once available. Carry a pin made
+    // while this group was still streaming across the tool-id → row-id handoff.
+    for (final group in displayMessages.whereType<ChatToolActivityGroup>()) {
+      final toolId = group.activities.first.toolId;
+      if (group.id.startsWith('message:') &&
+          toolId != null &&
+          toolId.isNotEmpty) {
+        _toolActivityPins.alias('tool:$toolId', group.id);
+      }
+    }
+
     return NotificationListener<ScrollMetricsNotification>(
       onNotification: (notification) {
         _syncEndAffordance(notification.metrics, clearUnreadAtEnd: false);
@@ -4757,10 +4777,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           itemBuilder: (context, index) {
             final item = displayMessages[index];
 
-            if (item is List<GatewayToolActivity>) {
+            if (item is ChatToolActivityGroup) {
               return GatewayActivityCard(
-                activities: item,
+                key: ValueKey<String>('tool-activity-${item.id}'),
+                activities: item.activities,
                 verbose: _verboseMode,
+                pinnedExpansion: _toolActivityPins[item.id],
+                onPinChanged: (expanded) {
+                  _toolActivityPins.pin(item.id, expanded);
+                  final toolId = item.activities.first.toolId;
+                  if (toolId != null && toolId.isNotEmpty) {
+                    _toolActivityPins.alias(item.id, 'tool:$toolId');
+                  }
+                },
               );
             }
             if (item is List<GatewaySubagentActivity>) {

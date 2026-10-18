@@ -10,6 +10,20 @@ class ChatReasoningItem {
   const ChatReasoningItem(this.text, this.initiallyExpanded);
 }
 
+/// Consecutive tool activities rendered as a single activity card.
+///
+/// [id] names the group rather than the slot it happens to occupy, and the
+/// first activity retains it across merges — including while the group is still
+/// growing. Callers can therefore hang per-group UI state (a
+/// card the user collapsed) off it and keep it across list reordering and
+/// lazy-list eviction, which a position-bound widget State cannot do.
+class ChatToolActivityGroup {
+  const ChatToolActivityGroup({required this.id, required this.activities});
+
+  final String id;
+  final List<GatewayToolActivity> activities;
+}
+
 /// Project a raw Hermes message list into the heterogeneous list the chat
 /// screen renders.
 ///
@@ -19,7 +33,7 @@ class ChatReasoningItem {
 /// - `Map<String, dynamic>` — a user or assistant bubble, carrying
 ///   `_display_content` (tool-result blocks stripped) and, for assistant
 ///   replies, `_retry_prompt` with the user prompt that caused it;
-/// - `List<GatewayToolActivity>` — consecutive tool results collapsed into one
+/// - [ChatToolActivityGroup] — consecutive tool results collapsed into one
 ///   activity card;
 /// - [ChatReasoningItem] — assistant reasoning, emitted before its bubble;
 /// - `GatewaySubagentActivity` list and [GatewayNotice] — appended last.
@@ -38,19 +52,38 @@ List<dynamic> buildChatDisplayItems({
   final toolQueue = List<GatewayToolActivity>.from(toolActivities);
   final displayItems = <dynamic>[];
   final currentGroup = <GatewayToolActivity>[];
+  String? currentGroupId;
   String? lastUserPrompt;
 
   void flushToolGroup() {
     if (currentGroup.isEmpty) return;
-    displayItems.add(currentGroup.toList());
+    displayItems.add(
+      ChatToolActivityGroup(
+        id: currentGroupId ?? currentGroup.first.identity,
+        activities: currentGroup.toList(),
+      ),
+    );
     currentGroup.clear();
+    currentGroupId = null;
   }
 
   for (final msg in messages) {
     final rawRole = (msg['role'] as String?) ?? 'assistant';
     final role = rawRole == 'agent' ? 'assistant' : rawRole;
     if (isToolResultMessage(msg)) {
-      if (toolQueue.isNotEmpty) currentGroup.add(toolQueue.removeAt(0));
+      if (toolQueue.isNotEmpty) {
+        final activity = toolQueue.removeAt(0);
+        if (currentGroup.isEmpty) {
+          // A stored row's id survives latest-history window shifts. If
+          // neither the activity nor the row has an id, its local identity
+          // is intentionally not shared with another same-name run.
+          final rowId = msg['id'] ?? msg['message_id'];
+          currentGroupId = rowId is num || rowId is String && rowId.isNotEmpty
+              ? 'message:$rowId'
+              : activity.identity;
+        }
+        currentGroup.add(activity);
+      }
       continue;
     }
     if (role != 'user' && role != 'assistant') continue;
@@ -85,7 +118,14 @@ List<dynamic> buildChatDisplayItems({
 
   // Tools from gateway events that arrived during streaming but were never
   // matched to a stored message — show them as a trailing card.
-  if (toolQueue.isNotEmpty) displayItems.add(toolQueue.toList());
+  if (toolQueue.isNotEmpty) {
+    displayItems.add(
+      ChatToolActivityGroup(
+        id: toolQueue.first.identity,
+        activities: toolQueue.toList(),
+      ),
+    );
+  }
   if (subagentActivities.isNotEmpty) {
     displayItems.add(List<GatewaySubagentActivity>.from(subagentActivities));
   }
