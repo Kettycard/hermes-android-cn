@@ -20,20 +20,56 @@ class GatewayActivityCard extends StatefulWidget {
 }
 
 class _GatewayActivityCardState extends State<GatewayActivityCard> {
-  late bool _expanded;
+  final ExpansibleController _tileController = ExpansibleController();
+
+  /// What the card opens to on its own: open while tools are running, closed
+  /// once the turn settles. `null` until the user overrules it by tapping.
+  bool? _userExpanded;
+
+  /// Set while this widget drives the controller, so the resulting
+  /// `onExpansionChanged` is not mistaken for a tap by the user.
+  bool _syncingExpansion = false;
+
+  bool get _hasRunningActivity =>
+      widget.activities.any((activity) => !activity.isTerminal);
+
+  bool get _autoExpanded => _hasRunningActivity || widget.verbose;
+
+  /// Whether the body rows render at full length. Reads intent rather than the
+  /// tile controller so the first frame (before the tile exists) is not wrong.
+  bool get _expanded => _userExpanded ?? _autoExpanded;
 
   @override
-  void initState() {
-    super.initState();
-    _expanded =
-        widget.activities.any((activity) => !activity.isTerminal) ||
-        widget.verbose;
+  void didUpdateWidget(GatewayActivityCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A tap pins the card: new tool calls arriving must not reopen it.
+    if (_userExpanded != null) return;
+    if (_autoExpanded == _tileController.isExpanded) return;
+    _syncingExpansion = true;
+    if (_autoExpanded) {
+      _tileController.expand();
+    } else {
+      _tileController.collapse();
+    }
+    _syncingExpansion = false;
+  }
+
+  @override
+  void dispose() {
+    _tileController.dispose();
+    super.dispose();
+  }
+
+  void _handleExpansionChanged(bool expanded) {
+    if (_syncingExpansion) return;
+    if (_userExpanded == expanded) return;
+    setState(() => _userExpanded = expanded);
   }
 
   @override
   Widget build(BuildContext context) {
     final activities = widget.activities;
-    final active = activities.any((activity) => !activity.isTerminal);
+    final active = _hasRunningActivity;
     final failures = activities.where((activity) => activity.isFailed).length;
     final subtitle = active
         ? (activities.length == 1
@@ -62,12 +98,13 @@ class _GatewayActivityCardState extends State<GatewayActivityCard> {
           child: Material(
             color: Colors.transparent,
             child: ExpansionTile(
-              key: PageStorageKey<String>(
-                'gateway-activity-${activities.map((item) => item.toolId ?? item.name).join('-')}',
-              ),
-              initiallyExpanded: active || widget.verbose,
-              onExpansionChanged: (expanded) =>
-                  setState(() => _expanded = expanded),
+              controller: _tileController,
+              // No PageStorageKey: the previous key was derived from the
+              // activity list, so every new tool call produced a new key and
+              // with it a fresh ExpansionTile — which re-expanded the card the
+              // user had just collapsed. Expansion state belongs to this State.
+              initiallyExpanded: _autoExpanded,
+              onExpansionChanged: _handleExpansionChanged,
               leading: active
                   ? const SizedBox.square(
                       dimension: 22,
