@@ -4,6 +4,32 @@ All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Release notes for
 versions prior to 1.0.7 are in the **What's new** sections of the [README](README.md).
 
+## [2.1.20] - 2026-10-18
+
+### Added
+
+- Ordinary launches check GitHub Releases for a newer Hermes Android APK no
+  more than once every 12 hours after an answered check. Offline attempts may
+  retry next launch. The advisory prompt opens the release in a browser;
+  it does not download or install anything. Shares, Quick Chat shortcuts, and
+  another screen opened before a slow check completes are not interrupted.
+- Settings → About offers a manual update check and an opt-out for launch
+  checks. **Later** prompts again on the next launch, while **Skip this
+  version** waits until a newer release. Both preferences are included in app
+  backups.
+
+### Fixed
+
+- A `304 Not Modified` response now compares the cached validated release
+  against the installed version instead of incorrectly claiming the app is
+  current. Update controls remain available when dashboard settings cannot
+  load; remote images in release notes no longer fetch third-party URLs.
+
+### Thanks
+
+- [@igitur](https://github.com/igitur) (Francois Botha) for the update-check
+  implementation, translations, and initial regressions in PR #143.
+
 ## [2.1.19] - 2026-10-12
 
 ### Added
