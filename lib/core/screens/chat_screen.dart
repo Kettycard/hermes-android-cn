@@ -432,6 +432,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   _PendingClarifyPrompt? _activeClarifyPrompt;
   bool _clarifyPromptRouteOpen = false;
 
+  /// Clarify prompts whose answer the user submitted from their own card.
+  ///
+  /// The batch transport locks one answer at a time and reports the remaining
+  /// question ids while that answer is still in flight, so the reconcile sees
+  /// the card's own question leave the pending set. Without this record it
+  /// would close the card a second time, and that surplus pop takes the route
+  /// underneath with it — the chat screen on the legacy transport, or the next
+  /// question of the batch once its card is open — leaving the batch
+  /// unanswerable until the chat is re-entered.
+  final Set<String> _selfAnsweredClarifyIdentities = {};
+
   // Voice input / spoken replies
   final FlutterTts _flutterTts = FlutterTts();
   late final VoiceComposerController _voiceComposer;
@@ -3452,6 +3463,30 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Sends the answer the user submitted from a clarify card.
+  ///
+  /// Records the prompt as self-answered for the duration of the send so the
+  /// remaining-questions reconcile does not close the card's route a second
+  /// time (see [_selfAnsweredClarifyIdentities]).
+  Future<void> _answerClarifyPrompt(
+    GatewayClarifyRequest request,
+    String answer,
+  ) async {
+    _selfAnsweredClarifyIdentities.add(request.identityKey);
+    try {
+      await _respondToGatewayClarify(
+        requestId: request.requestId,
+        questionId: request.questionId,
+        answer: answer,
+      );
+    } catch (_) {
+      // A failed send keeps the card open for a retry, so the reconcile may
+      // own the route again.
+      _selfAnsweredClarifyIdentities.remove(request.identityKey);
+      rethrow;
+    }
+  }
+
   Future<void> _respondToGatewayClarify({
     required String requestId,
     required String answer,
@@ -3791,6 +3826,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         remaining.contains(active?.request.questionId)) {
       return;
     }
+    // An answer the user sent from this card closes its own route once the
+    // lock lands. The reconcile is for questions resolved elsewhere, so leave
+    // the route alone here instead of popping it twice.
+    if (_selfAnsweredClarifyIdentities.remove(active!.request.identityKey)) {
+      return;
+    }
     _cancelledInteractiveRequestIds.add(requestId);
     if (_clarifyPromptRouteOpen) {
       Navigator.of(context, rootNavigator: true).pop(false);
@@ -3861,14 +3902,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         barrierDismissible: true,
         builder: (_) => GatewayClarifyDialog(
           request: pending.request,
-          onRespond: (answer) => _respondToGatewayClarify(
-            requestId: pending.request.requestId,
-            questionId: pending.request.questionId,
-            answer: answer,
-          ),
+          onRespond: (answer) => _answerClarifyPrompt(pending.request, answer),
         ),
       );
       _clarifyPromptRouteOpen = false;
+      _selfAnsweredClarifyIdentities.remove(pending.request.identityKey);
       final wasCancelled = _cancelledInteractiveRequestIds.remove(
         pending.request.requestId,
       );
