@@ -4,6 +4,34 @@ All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Release notes for
 versions prior to 1.0.7 are in the **What's new** sections of the [README](README.md).
 
+## [2.1.22] - 2026-10-19
+
+### Added
+
+- Settings → Appearance now offers a Compact chat density that reduces bubble
+  spacing and hides visual sender labels while preserving screen-reader speaker
+  announcements. The choice updates open chats immediately, survives backup
+  restore and remains available when the dashboard is offline (PR #147).
+
+### Fixed
+
+- Tool activity cards now respect a user's collapsed or expanded choice while
+  more tools run, even when the card moves in the chat list or history pages
+  change (PR #148).
+- Answering one question in a batch clarification no longer closes the chat or
+  the next question; cancellation and overlapping approval dialogs also leave
+  the correct route open (PR #145).
+
+### Thanks
+
+- [@igitur](https://github.com/igitur) (Francois Botha) for Compact chat
+  density and persistent tool-card expansion, with widget regressions in PRs
+  #147 and #148.
+- [@dadofsambonzuki](https://github.com/dadofsambonzuki) (Nathan Day) for
+  diagnosing and fixing batch clarification navigation in PR #145.
+- Maintainer follow-up commits addressed additional accessibility, identity,
+  and overlapping-dialog edge cases while preserving contributor commits.
+
 ## [2.1.21] - 2026-10-19 — Optimisation Release
 
 ### Changed

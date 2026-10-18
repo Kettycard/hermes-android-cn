@@ -1,4 +1,4 @@
-# Hermes Android — v2.1.21
+# Hermes Android — v2.1.22
 
 Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — chat with your Hermes sessions from a phone or tablet over local Wi-Fi or a private Tailscale network.
 
@@ -14,15 +14,16 @@ Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — ch
 
 ## Current release
 
-- Version: **2.1.21** (build 2164)
+- Version: **2.1.22** (build 2165)
 - Package: `com.hermesagent.hermes_android`
 - Recommended APK for modern phones: ARM64 release build from the
   [Releases](https://github.com/rusty4444/hermes-android/releases) page.
 - Production builds are signed with a private release keystore. Debug APKs
   signed with the Android debug certificate remain available for testing
   under the `com.hermesagent.hermes_android.dev` package ID.
-- The Optimisation Release was developed with Hermes Agent assistance and
-  tested on-device by [@rusty4444](https://github.com/rusty4444) before merge.
+- v2.1.22 includes contributions from [@igitur](https://github.com/igitur)
+  and [@dadofsambonzuki](https://github.com/dadofsambonzuki), with maintainer
+  follow-up fixes. See [Credits](#credits) and the [changelog](CHANGELOG.md).
 - The app checks [GitHub Releases](https://github.com/rusty4444/hermes-android/releases)
   on ordinary launches. An answered check limits network requests to once
   every 12 hours; offline attempts may retry at the next launch. A newer build
@@ -72,6 +73,19 @@ gateway explicitly advertises the compatible recovery contract.
 See [CHANGELOG.md](CHANGELOG.md) for the complete release history and
 [docs/HERMESAPK_DEVELOPMENT_LOG.md](docs/HERMESAPK_DEVELOPMENT_LOG.md) for the
 sanitized implementation and validation record.
+
+## What's new in v2.1.22
+
+- **Compact chat density** — choose Settings → Appearance → Chat density for
+  tighter bubbles and fewer visual sender labels; speaker information remains
+  available to screen readers. The setting updates open chats and survives
+  backup restore (PR #147, @igitur).
+- **Tool cards respect your choice** — collapse a running activity card and it
+  stays closed as tools arrive or the row moves; expand it and it stays open
+  after the turn finishes (PR #148, @igitur).
+- **Batch clarifications stay in chat** — answering one question no longer
+  dismisses the conversation or the next question, even when a cancellation or
+  approval overlaps it (PR #145, @dadofsambonzuki).
 
 ## Optimisation Release — what's new in v2.1.21
 
@@ -674,7 +688,7 @@ cp build/app/outputs/flutter-apk/app-*-release.apk release-apks/
 block in `android/app/build.gradle.kts` derives per-ABI codes as
 `base * 10 + ABI code` (armeabi-v7a = 1, arm64-v8a = 2, x86_64 = 3), so the
 codes stay ordered armeabi-v7a < arm64-v8a < x86_64 as fdroiddata requires.
-For v2.1.21, base `2164` therefore produces codes `21641`/`21642`/`21643`.
+For v2.1.22, base `2165` therefore produces codes `21651`/`21652`/`21653`.
 CI reads the completed arm64 APK with `aapt` and fails if that relationship
 drifts. Release-floor checks continue to apply to the base value and must not
 be weakened to rely on the ABI code.
@@ -788,6 +802,8 @@ lib/
 - **simplaerai-sv** — kept the attachment composer, multiline captions, and
   Send button usable above the keyboard across narrow, landscape, and
   large-text layouts, with focused widget regressions in PR #139 (v2.1.18).
+- **dadofsambonzuki** — fixed batch clarification navigation so answering a
+  question does not dismiss the chat or another prompt (PR #145, v2.1.22).
 - **HorCyChangGenitek** — reported and documented the API-only model-picker
   failure that incorrectly required the Desktop Dashboard on port `9119`
   (#129). Fixed in v2.1.17.
@@ -804,7 +820,8 @@ lib/
   preserved running Hermes turns when leaving a chat (PR #113), with focused
   regression coverage for both fixes (v2.1.8). They also added the in-app
   GitHub release update check, translations, and initial regressions in PR #143
-  (v2.1.20).
+  (v2.1.20). They contributed Compact chat density and persistent tool-card
+  expansion with widget regressions in PRs #147 and #148 (v2.1.22).
 - **Thaeland** — contributed the extensive stock-gateway compatibility and
   reliability work in PR #106: durable reconnect recovery, Projects and Chats
   wire-contract fixes, safe pagination and folder ownership, transport
