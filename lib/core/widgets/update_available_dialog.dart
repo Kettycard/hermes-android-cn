@@ -74,7 +74,15 @@ class UpdateAvailableDialog extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
-              MarkdownBody(data: release.notes, shrinkWrap: true),
+              MarkdownBody(
+                data: release.notes,
+                shrinkWrap: true,
+                // Release notes are remote Markdown. Showing a tracking image
+                // must not contact a third party without an explicit tap.
+                sizedImageBuilder: (image) => Text(
+                  image.alt?.isNotEmpty == true ? image.alt! : '[image]',
+                ),
+              ),
             ],
           ],
         ),

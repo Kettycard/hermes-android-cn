@@ -168,6 +168,7 @@ class AppUpdateService {
 
   static const lastCheckKey = 'app_update_last_check_v1';
   static const etagKey = 'app_update_etag_v1';
+  static const cachedReleaseKey = 'app_update_cached_release_v1';
   static const skippedVersionKey = 'app_update_skipped_version_v1';
   static const checkOnLaunchKey = 'app_update_check_on_launch_v1';
 
@@ -194,31 +195,40 @@ class AppUpdateService {
         'Accept': 'application/vnd.github+json',
         'User-Agent': 'hermes-android',
       };
-      final etag = preferences.getString(etagKey);
-      // Conditional request: an unchanged release answers 304 with no body,
-      // which keeps a twice-a-day check off the caller's rate budget.
+      final cachedRelease = _cachedRelease(preferences);
+      final etag = cachedRelease == null
+          ? null
+          : preferences.getString(etagKey);
+      // A 304 is useful only when we retained the release it refers to.
       if (etag != null && etag.isNotEmpty) headers['If-None-Match'] = etag;
       final response = await _http
           .get(Uri.parse(releasesApiUrl), headers: headers)
           .timeout(requestTimeout);
       await _recordCheck(preferences);
       if (response.statusCode == 304) {
-        return const AppUpdateResult(AppUpdateOutcome.upToDate);
+        return cachedRelease == null
+            ? const AppUpdateResult(AppUpdateOutcome.failed)
+            : _compareRelease(cachedRelease, currentVersion);
       }
       if (response.statusCode != 200) {
+        await _clearCachedRelease(preferences);
         return const AppUpdateResult(AppUpdateOutcome.failed);
-      }
-      final responseEtag = response.headers['etag'];
-      if (responseEtag != null && responseEtag.isNotEmpty) {
-        await preferences.setString(etagKey, responseEtag);
       }
       final release = parseRelease(response.body);
       if (release == null) {
+        await _clearCachedRelease(preferences);
         return const AppUpdateResult(AppUpdateOutcome.failed);
       }
-      return isNewerAppVersion(release.version, currentVersion)
-          ? AppUpdateResult(AppUpdateOutcome.updateAvailable, release: release)
-          : const AppUpdateResult(AppUpdateOutcome.upToDate);
+      // Persist validated metadata before its ETag: the pair must survive
+      // restarts for a 304 to have the same meaning as the original 200.
+      await preferences.setString(cachedReleaseKey, response.body);
+      final responseEtag = response.headers['etag'];
+      if (responseEtag != null && responseEtag.isNotEmpty) {
+        await preferences.setString(etagKey, responseEtag);
+      } else {
+        await preferences.remove(etagKey);
+      }
+      return _compareRelease(release, currentVersion);
     } catch (_) {
       // Offline, DNS failure, timeout: the attempt never reached GitHub, so it
       // is not charged to the throttle — the next launch may try again. A
@@ -229,7 +239,7 @@ class AppUpdateService {
   }
 
   /// The release worth prompting about at launch, or null when there is nothing
-  /// to say — the check is switched off, was made recently, found nothing, or
+  /// to say — the check is switched off, found nothing, or
   /// names a version the user already skipped.
   ///
   /// Kept here rather than in the widget so the whole launch policy — enabled,
@@ -239,8 +249,15 @@ class AppUpdateService {
   }) async {
     if (!await checkOnLaunchEnabled()) return null;
     final result = await checkForUpdate(currentVersion: currentVersion);
-    if (!result.hasUpdate) return null;
-    final release = result.release!;
+    // Throttling applies to the network, not to presentation: "Later" should
+    // prompt on the next launch even when no second request is due yet.
+    final release = result.outcome == AppUpdateOutcome.throttled
+        ? _cachedRelease(await _prefs)
+        : result.release;
+    if (release == null ||
+        !isNewerAppVersion(release.version, currentVersion)) {
+      return null;
+    }
     final skipped = await skippedVersion();
     if (skipped != null && normalizeAppVersion(skipped) == release.version) {
       return null;
@@ -271,6 +288,23 @@ class AppUpdateService {
   Future<void> clearSkippedVersion() async {
     final preferences = await _prefs;
     await preferences.remove(skippedVersionKey);
+  }
+
+  AppUpdateResult _compareRelease(
+    AppReleaseInfo release,
+    String currentVersion,
+  ) => isNewerAppVersion(release.version, currentVersion)
+      ? AppUpdateResult(AppUpdateOutcome.updateAvailable, release: release)
+      : const AppUpdateResult(AppUpdateOutcome.upToDate);
+
+  AppReleaseInfo? _cachedRelease(SharedPreferences preferences) {
+    final raw = preferences.getString(cachedReleaseKey);
+    return raw == null ? null : parseRelease(raw);
+  }
+
+  Future<void> _clearCachedRelease(SharedPreferences preferences) async {
+    await preferences.remove(cachedReleaseKey);
+    await preferences.remove(etagKey);
   }
 
   Future<bool> _isThrottled(SharedPreferences preferences) async {

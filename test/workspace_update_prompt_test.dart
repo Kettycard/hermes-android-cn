@@ -4,6 +4,8 @@
 // The service is the real one, driven by a fake GitHub; only the installed
 // version is stubbed, because package_info has no platform channel in tests.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hermes_android/core/l10n/l10n.dart';
@@ -60,18 +62,6 @@ Future<void> pumpLaunch(
   await tester.pumpAndSettle();
 }
 
-/// Ages the throttle window so the next launch performs a real check.
-Future<void> ageLastCheck() async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(
-    AppUpdateService.lastCheckKey,
-    DateTime.now()
-        .toUtc()
-        .subtract(AppUpdateService.checkInterval * 2)
-        .toIso8601String(),
-  );
-}
-
 /// Simulates the *next* launch: unmounting the shell first drops its State, so
 /// the launch hook runs again instead of being skipped by element reuse.
 Future<void> relaunch(
@@ -80,7 +70,6 @@ Future<void> relaunch(
 }) async {
   await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
   await tester.pumpAndSettle();
-  await ageLastCheck();
   await pumpLaunch(tester, service: service);
 }
 
@@ -188,6 +177,28 @@ void main() {
       sharedPayload: const AndroidSharePayload(text: 'https://example.com'),
     );
 
+    expect(find.text('Update available'), findsNothing);
+  });
+
+  testWidgets('a late release response does not interrupt a pushed route', (
+    tester,
+  ) async {
+    final response = Completer<http.Response>();
+    final service = AppUpdateService(
+      client: MockClient((request) => response.future),
+    );
+    await pumpLaunch(tester, service: service);
+
+    Navigator.of(tester.element(find.byType(WorkspaceScreen))).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(body: Text('Current task')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    response.complete(http.Response(_releaseJson('v2.1.20'), 200));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Current task'), findsOneWidget);
     expect(find.text('Update available'), findsNothing);
   });
 }

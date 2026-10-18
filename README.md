@@ -21,6 +21,14 @@ Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — ch
 - Production builds are signed with a private release keystore. Debug APKs
   signed with the Android debug certificate remain available for testing
   under the `com.hermesagent.hermes_android.dev` package ID.
+- The app checks [GitHub Releases](https://github.com/rusty4444/hermes-android/releases)
+  on ordinary launches (at most every 12 hours) and offers a newer build in a
+  dialog. It never downloads or installs APKs itself. **Later** asks again on
+  the next launch; **Skip this version** stays quiet until a newer version is
+  published. Shares and Quick Chat shortcuts are not interrupted. In
+  **Settings → About**, use **Check for updates** for an immediate check or
+  disable **Check for updates on launch**. These choices are included in app
+  backups; HTTP response caches are not.
 - Previous upstream releases remain available from the
   [Releases](https://github.com/rusty4444/hermes-android/releases) page.
 

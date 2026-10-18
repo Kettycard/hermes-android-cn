@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hermes_android/core/services/app_update_service.dart';
+import 'package:hermes_android/core/services/config_backup_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -125,18 +126,56 @@ void main() {
       },
     );
 
-    test('a 304 answer from the conditional request is up to date', () async {
-      final client = MockClient((request) async {
-        expect(request.headers.containsKey('If-None-Match'), isTrue);
-        return http.Response('', 304);
-      });
+    test('304 reuses the release for an outdated installation', () async {
+      var calls = 0;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(AppUpdateService.etagKey, 'W/"cached"');
-      final service = AppUpdateService(client: client, preferences: prefs);
+      final service = AppUpdateService(
+        preferences: prefs,
+        client: MockClient((request) async {
+          calls++;
+          if (calls == 1) {
+            expect(request.headers.containsKey('If-None-Match'), isFalse);
+            return http.Response(
+              releaseJson(),
+              200,
+              headers: {'etag': 'W/"cached"'},
+            );
+          }
+          expect(request.headers['If-None-Match'], 'W/"cached"');
+          return http.Response('', 304);
+        }),
+      );
 
-      final result = await service.checkForUpdate(currentVersion: '2.1.19');
+      expect(
+        (await service.checkForUpdate(currentVersion: '2.1.19')).hasUpdate,
+        isTrue,
+      );
+      final result = await AppUpdateService(
+        preferences: prefs,
+        client: MockClient((request) async {
+          expect(request.headers['If-None-Match'], 'W/"cached"');
+          return http.Response('', 304);
+        }),
+      ).checkForUpdate(currentVersion: '2.1.19', force: true);
+      expect(result.hasUpdate, isTrue);
+      expect(result.release?.version, '2.1.20');
+      expect(result.release?.notes, contains('chat stream'));
+    });
 
-      expect(result.outcome, AppUpdateOutcome.upToDate);
+    test('orphaned ETag cannot cause a false up-to-date result', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppUpdateService.etagKey, 'W/"orphaned"');
+      final service = AppUpdateService(
+        preferences: prefs,
+        client: MockClient((request) async {
+          expect(request.headers.containsKey('If-None-Match'), isFalse);
+          return http.Response(releaseJson(), 200);
+        }),
+      );
+      expect(
+        (await service.checkForUpdate(currentVersion: '2.1.19')).hasUpdate,
+        isTrue,
+      );
     });
 
     test('an answered failure reports failed without throwing', () async {
@@ -367,6 +406,24 @@ void main() {
   });
 
   group('preferences', () {
+    test('backups retain update choices but not transient HTTP cache', () {
+      expect(
+        ConfigBackupService.isBackedUpKey(AppUpdateService.checkOnLaunchKey),
+        isTrue,
+      );
+      expect(
+        ConfigBackupService.isBackedUpKey(AppUpdateService.skippedVersionKey),
+        isTrue,
+      );
+      expect(
+        ConfigBackupService.isBackedUpKey(AppUpdateService.cachedReleaseKey),
+        isFalse,
+      );
+      expect(
+        ConfigBackupService.isBackedUpKey(AppUpdateService.etagKey),
+        isFalse,
+      );
+    });
     test('launch checks are on until the user turns them off', () async {
       final service = AppUpdateService();
       expect(await service.checkOnLaunchEnabled(), isTrue);

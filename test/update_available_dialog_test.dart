@@ -91,6 +91,22 @@ void main() {
     expect(find.byType(MarkdownBody), findsNothing);
   });
 
+  testWidgets('remote release-note images render as text, not network images', (
+    tester,
+  ) async {
+    await pumpPrompt(
+      tester,
+      release: const AppReleaseInfo(
+        version: '2.1.20',
+        tagName: 'v2.1.20',
+        releaseUrl: 'https://github.com/rusty4444/hermes-android/releases',
+        notes: '![Preview](https://tracker.example/pixel.png)',
+      ),
+    );
+    expect(find.text('Preview', findRichText: true), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+  });
+
   testWidgets('View release opens the release page and reports it', (
     tester,
   ) async {

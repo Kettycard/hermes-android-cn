@@ -176,32 +176,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     if (_error != null && _modelOptions == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.orange),
-              const SizedBox(height: 16),
-              Text(
-                context.l10n.failed_to_load_settings,
-                style: Theme.of(context).textTheme.titleMedium,
+      // Update preferences and the About card are device-local. Keep them
+      // reachable even when the separate Hermes dashboard cannot answer.
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: Colors.orange,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    context.l10n.failed_to_load_settings,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _error!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: _loadData,
+                    child: Text(context.l10n.retry),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                style: Theme.of(context).textTheme.bodySmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _loadData,
-                child: Text(context.l10n.retry),
-              ),
-            ],
+            ),
           ),
-        ),
+          const SizedBox(height: 16),
+          _buildSectionHeader(context.l10n.about),
+          _AboutCard(),
+        ],
       );
     }
 

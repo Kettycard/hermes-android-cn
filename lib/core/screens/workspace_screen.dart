@@ -595,7 +595,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       final release = await _updateService.launchPromptRelease(
         currentVersion: current,
       );
-      if (release == null || !mounted) return;
+      if (release == null ||
+          !mounted ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
       final action = await showUpdateAvailableDialog(context, release: release);
       if (action == UpdatePromptAction.skipVersion) {
         await _updateService.skipVersion(release.version);
