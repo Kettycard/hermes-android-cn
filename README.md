@@ -1,4 +1,4 @@
-# Hermes Android — v2.1.20
+# Hermes Android — v2.1.21
 
 Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — chat with your Hermes sessions from a phone or tablet over local Wi-Fi or a private Tailscale network.
 
@@ -14,13 +14,15 @@ Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — ch
 
 ## Current release
 
-- Version: **2.1.20** (build 2160)
+- Version: **2.1.21** (build 2164)
 - Package: `com.hermesagent.hermes_android`
 - Recommended APK for modern phones: ARM64 release build from the
   [Releases](https://github.com/rusty4444/hermes-android/releases) page.
 - Production builds are signed with a private release keystore. Debug APKs
   signed with the Android debug certificate remain available for testing
   under the `com.hermesagent.hermes_android.dev` package ID.
+- The Optimisation Release was developed with Hermes Agent assistance and
+  tested on-device by [@rusty4444](https://github.com/rusty4444) before merge.
 - The app checks [GitHub Releases](https://github.com/rusty4444/hermes-android/releases)
   on ordinary launches. An answered check limits network requests to once
   every 12 hours; offline attempts may retry at the next launch. A newer build
@@ -70,6 +72,18 @@ gateway explicitly advertises the compatible recovery contract.
 See [CHANGELOG.md](CHANGELOG.md) for the complete release history and
 [docs/HERMESAPK_DEVELOPMENT_LOG.md](docs/HERMESAPK_DEVELOPMENT_LOG.md) for the
 sanitized implementation and validation record.
+
+## Optimisation Release — what's new in v2.1.21
+
+- **Faster startup** — the first Flutter frame appears before saved credentials
+  and Android launch intents finish loading; secure migration and recovery
+  still complete before the connected Home screen opens.
+- **Progressive Home and Chats** — Home displays its first five sessions while
+  the full list loads behind a progress bar. Opening Chats early shows available
+  human conversations and the same progress state, adding more as scan pages
+  arrive. After Home has loaded, Chats reuses its complete session list instead
+  of scanning it again. Older blocked work, local pins, and Quick Chat archive
+  records remain available (PR #146).
 
 ## What's new in v2.1.20
 
@@ -660,7 +674,7 @@ cp build/app/outputs/flutter-apk/app-*-release.apk release-apks/
 block in `android/app/build.gradle.kts` derives per-ABI codes as
 `base * 10 + ABI code` (armeabi-v7a = 1, arm64-v8a = 2, x86_64 = 3), so the
 codes stay ordered armeabi-v7a < arm64-v8a < x86_64 as fdroiddata requires.
-For v2.1.20, base `2160` therefore produces codes `21601`/`21602`/`21603`.
+For v2.1.21, base `2164` therefore produces codes `21641`/`21642`/`21643`.
 CI reads the completed arm64 APK with `aapt` and fails if that relationship
 drifts. Release-floor checks continue to apply to the base value and must not
 be weakened to rely on the ABI code.

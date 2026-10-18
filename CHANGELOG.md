@@ -4,6 +4,30 @@ All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Release notes for
 versions prior to 1.0.7 are in the **What's new** sections of the [README](README.md).
 
+## [2.1.21] - 2026-10-19 — Optimisation Release
+
+### Changed
+
+- The first Flutter frame no longer waits for saved preferences, Android
+  Keystore reads, or initial intent probes. Secure credential migration and
+  share/Quick Chat intents still complete before entering Home.
+- Home displays its first five sessions with a progress bar while the full
+  list loads. Chats shows a provisional human-chat list when opened early,
+  fills it from the same background scan, and reuses Home's complete list when
+  available instead of starting another full scan (PR #146).
+
+### Fixed
+
+- Incomplete or shifting session pages no longer prune device-local Quick Chat
+  archive records. Older blocked work and local pins remain reachable after
+  the full scan.
+
+### Thanks
+
+- [@rusty4444](https://github.com/rusty4444) for testing the prereleases on
+  Android and identifying the early Chats transition. Implementation was
+  assisted by Hermes Agent.
+
 ## [2.1.20] - 2026-10-18
 
 ### Added
