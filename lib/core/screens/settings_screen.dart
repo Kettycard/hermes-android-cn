@@ -13,6 +13,8 @@ import '../widgets/config_backup_card.dart';
 import '../widgets/text_size_settings_card.dart';
 import '../../main.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../services/app_update_service.dart';
+import '../widgets/update_available_dialog.dart';
 
 import 'package:hermes_android/core/l10n/l10n.dart';
 
@@ -174,32 +176,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     if (_error != null && _modelOptions == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.orange),
-              const SizedBox(height: 16),
-              Text(
-                context.l10n.failed_to_load_settings,
-                style: Theme.of(context).textTheme.titleMedium,
+      // Update preferences and the About card are device-local. Keep them
+      // reachable even when the separate Hermes dashboard cannot answer.
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: Colors.orange,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    context.l10n.failed_to_load_settings,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _error!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: _loadData,
+                    child: Text(context.l10n.retry),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                style: Theme.of(context).textTheme.bodySmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _loadData,
-                child: Text(context.l10n.retry),
-              ),
-            ],
+            ),
           ),
-        ),
+          const SizedBox(height: 16),
+          _buildSectionHeader(context.l10n.about),
+          _AboutCard(),
+        ],
       );
     }
 
@@ -508,11 +524,15 @@ class _AboutCard extends StatefulWidget {
 
 class _AboutCardState extends State<_AboutCard> {
   String _version = '';
+  bool _checking = false;
+  bool _checkOnLaunch = true;
+  String? _updateStatus;
 
   @override
   void initState() {
     super.initState();
     _loadVersion();
+    _loadUpdatePreference();
   }
 
   Future<void> _loadVersion() async {
@@ -523,6 +543,57 @@ class _AboutCardState extends State<_AboutCard> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _version = 'unknown');
+    }
+  }
+
+  Future<void> _loadUpdatePreference() async {
+    final enabled = await AppUpdateService().checkOnLaunchEnabled();
+    if (!mounted) return;
+    setState(() => _checkOnLaunch = enabled);
+  }
+
+  Future<void> _setCheckOnLaunch(bool enabled) async {
+    setState(() => _checkOnLaunch = enabled);
+    await AppUpdateService().setCheckOnLaunchEnabled(enabled);
+  }
+
+  /// The manual path: always a real check, and always an answer — the
+  /// launch-time prompt is the one that stays quiet when GitHub cannot be
+  /// reached, because there the user did not ask.
+  Future<void> _checkForUpdates() async {
+    setState(() {
+      _checking = true;
+      _updateStatus = null;
+    });
+    final service = AppUpdateService();
+    AppUpdateResult result;
+    try {
+      final current = await installedAppVersion() ?? _version;
+      result = await service.checkForUpdate(
+        currentVersion: current,
+        force: true,
+      );
+    } catch (_) {
+      result = const AppUpdateResult(AppUpdateOutcome.failed);
+    }
+    if (!mounted) return;
+    setState(() => _checking = false);
+    final l10n = context.l10n;
+    switch (result.outcome) {
+      case AppUpdateOutcome.updateAvailable:
+        final release = result.release!;
+        final action = await showUpdateAvailableDialog(
+          context,
+          release: release,
+        );
+        if (action == UpdatePromptAction.skipVersion) {
+          await service.skipVersion(release.version);
+        }
+      case AppUpdateOutcome.upToDate:
+        setState(() => _updateStatus = l10n.you_re_on_the_latest_version);
+      case AppUpdateOutcome.throttled:
+      case AppUpdateOutcome.failed:
+        setState(() => _updateStatus = l10n.couldn_t_check_for_updates);
     }
   }
 
@@ -548,6 +619,26 @@ class _AboutCardState extends State<_AboutCard> {
                   .l10n
                   .browse_and_manage_your_hermes_agent_sessions_from_your_phone,
               style: TextStyle(color: Colors.grey),
+            ),
+            const Divider(height: 24),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(context.l10n.check_for_updates),
+              subtitle: _updateStatus == null ? null : Text(_updateStatus!),
+              trailing: _checking
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              onTap: _checking ? null : _checkForUpdates,
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(context.l10n.check_for_updates_on_launch),
+              value: _checkOnLaunch,
+              onChanged: _setCheckOnLaunch,
             ),
           ],
         ),

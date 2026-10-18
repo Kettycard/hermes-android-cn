@@ -3,6 +3,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config_backup.dart';
+import 'app_update_service.dart';
 import 'connection_manager.dart';
 import 'local_chat_pin_store.dart';
 
@@ -57,6 +58,8 @@ class ConfigBackupService {
     'voice_name',
     'voice_locale',
     'app_text_size_preference',
+    AppUpdateService.checkOnLaunchKey,
+    AppUpdateService.skippedVersionKey,
   };
 
   /// Prefixes for per-connection and per-chat preferences, which are keyed by
