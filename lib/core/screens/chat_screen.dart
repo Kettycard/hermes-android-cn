@@ -431,6 +431,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final List<_PendingClarifyPrompt> _clarifyPromptQueue = [];
   _PendingClarifyPrompt? _activeClarifyPrompt;
   bool _clarifyPromptRouteOpen = false;
+  Route<bool>? _clarifyPromptRoute;
+  bool _clarifyPromptClosing = false;
+
+  /// Clarify prompts whose answer the user submitted from their own card.
+  ///
+  /// The batch transport locks one answer at a time and reports the remaining
+  /// question ids while that answer is still in flight, so the reconcile sees
+  /// the card's own question leave the pending set. Without this record it
+  /// would close the card a second time, and that surplus pop takes the route
+  /// underneath with it — the chat screen on the legacy transport, or the next
+  /// question of the batch once its card is open — leaving the batch
+  /// unanswerable until the chat is re-entered.
+  final Set<String> _selfAnsweredClarifyIdentities = {};
 
   // Voice input / spoken replies
   final FlutterTts _flutterTts = FlutterTts();
@@ -3452,6 +3465,67 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Sends the answer the user submitted from a clarify card.
+  ///
+  /// Records the prompt as self-answered for the duration of the send so the
+  /// remaining-questions reconcile does not close the card's route a second
+  /// time (see [_selfAnsweredClarifyIdentities]).
+  Future<void> _answerClarifyPrompt(
+    GatewayClarifyRequest request,
+    String answer,
+  ) async {
+    _selfAnsweredClarifyIdentities.add(request.identityKey);
+    try {
+      await _respondToGatewayClarify(
+        requestId: request.requestId,
+        questionId: request.questionId,
+        answer: answer,
+      );
+    } catch (_) {
+      // A failed send keeps the card open for a retry, so the reconcile may
+      // own the route again.
+      _selfAnsweredClarifyIdentities.remove(request.identityKey);
+      rethrow;
+    }
+  }
+
+  /// Whether the open clarify card still belongs to [request].
+  ///
+  /// A `request.cancel` arriving while `clarify.lock` is pending closes the
+  /// card itself, and the drain can open the next question's card before the
+  /// late answer (the gateway reports `status: expired`) resolves. A card may
+  /// only close the route it still owns: popping otherwise takes whatever is
+  /// on top — the chat screen, or the next question's card — with it.
+  bool _ownsClarifyPromptRoute(GatewayClarifyRequest request) {
+    return _clarifyPromptRouteOpen &&
+        !_clarifyPromptClosing &&
+        _activeClarifyPrompt?.request.identityKey == request.identityKey;
+  }
+
+  void _closeClarifyPromptRoute() {
+    if (_clarifyPromptClosing) return;
+    final route = _clarifyPromptRoute;
+    if (route == null) {
+      // showDialog pushed the route but its builder has not run yet.
+      // Wait for its identity rather than popping an unrelated top route.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _clarifyPromptRouteOpen && _clarifyPromptRoute != null) {
+          _closeClarifyPromptRoute();
+        }
+      });
+      return;
+    }
+    _clarifyPromptClosing = true;
+    final navigator = Navigator.of(context, rootNavigator: true);
+    if (route.isCurrent) {
+      navigator.pop(false);
+    } else {
+      // A newer approval may be above clarify. Expiring clarify must not
+      // dismiss that independent request or send an unintended denial.
+      navigator.removeRoute(route, false);
+    }
+  }
+
   Future<void> _respondToGatewayClarify({
     required String requestId,
     required String answer,
@@ -3760,7 +3834,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
       if (_activeClarifyPrompt?.request.requestId == requestId &&
           _clarifyPromptRouteOpen) {
-        Navigator.of(context, rootNavigator: true).pop(false);
+        _closeClarifyPromptRoute();
       } else if (_activeClarifyPrompt?.request.requestId != requestId) {
         _cancelledInteractiveRequestIds.remove(requestId);
       }
@@ -3791,9 +3865,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         remaining.contains(active?.request.questionId)) {
       return;
     }
+    // An answer the user sent from this card closes its own route once the
+    // lock lands. The reconcile is for questions resolved elsewhere, so leave
+    // the route alone here instead of popping it twice.
+    if (_selfAnsweredClarifyIdentities.remove(active!.request.identityKey)) {
+      return;
+    }
     _cancelledInteractiveRequestIds.add(requestId);
     if (_clarifyPromptRouteOpen) {
-      Navigator.of(context, rootNavigator: true).pop(false);
+      _closeClarifyPromptRoute();
     } else {
       _activeClarifyPrompt = null;
       _cancelledInteractiveRequestIds.remove(requestId);
@@ -3859,16 +3939,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final responded = await showDialog<bool>(
         context: context,
         barrierDismissible: true,
-        builder: (_) => GatewayClarifyDialog(
-          request: pending.request,
-          onRespond: (answer) => _respondToGatewayClarify(
-            requestId: pending.request.requestId,
-            questionId: pending.request.questionId,
-            answer: answer,
-          ),
-        ),
+        builder: (dialogContext) {
+          _clarifyPromptRoute = ModalRoute.of<bool>(dialogContext);
+          return GatewayClarifyDialog(
+            request: pending.request,
+            onRespond: (answer) =>
+                _answerClarifyPrompt(pending.request, answer),
+            canCloseRoute: () => _ownsClarifyPromptRoute(pending.request),
+          );
+        },
       );
       _clarifyPromptRouteOpen = false;
+      _clarifyPromptRoute = null;
+      _clarifyPromptClosing = false;
+      _selfAnsweredClarifyIdentities.remove(pending.request.identityKey);
       final wasCancelled = _cancelledInteractiveRequestIds.remove(
         pending.request.requestId,
       );
