@@ -788,7 +788,9 @@ lib/
   (v2.1.15).
 - **igitur** — diagnosed and fixed explicit HTTPS port handling (PR #111) and
   preserved running Hermes turns when leaving a chat (PR #113), with focused
-  regression coverage for both fixes. Released in v2.1.8.
+  regression coverage for both fixes (v2.1.8). They also added the in-app
+  GitHub release update check, translations, and initial regressions in PR #143
+  (v2.1.20).
 - **Thaeland** — contributed the extensive stock-gateway compatibility and
   reliability work in PR #106: durable reconnect recovery, Projects and Chats
   wire-contract fixes, safe pagination and folder ownership, transport
