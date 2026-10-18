@@ -3487,6 +3487,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Whether the open clarify card still belongs to [request].
+  ///
+  /// A `request.cancel` arriving while `clarify.lock` is pending closes the
+  /// card itself, and the drain can open the next question's card before the
+  /// late answer (the gateway reports `status: expired`) resolves. A card may
+  /// only close the route it still owns: popping otherwise takes whatever is
+  /// on top — the chat screen, or the next question's card — with it.
+  bool _ownsClarifyPromptRoute(GatewayClarifyRequest request) {
+    return _clarifyPromptRouteOpen &&
+        _activeClarifyPrompt?.request.identityKey == request.identityKey;
+  }
+
   Future<void> _respondToGatewayClarify({
     required String requestId,
     required String answer,
@@ -3903,6 +3915,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         builder: (_) => GatewayClarifyDialog(
           request: pending.request,
           onRespond: (answer) => _answerClarifyPrompt(pending.request, answer),
+          canCloseRoute: () => _ownsClarifyPromptRoute(pending.request),
         ),
       );
       _clarifyPromptRouteOpen = false;

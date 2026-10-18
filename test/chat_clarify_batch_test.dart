@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -27,9 +28,23 @@ class _BatchClarifySession implements GatewayTurnApplicationSession {
   final Map<String, Set<String>> _open = {};
   final List<({String requestId, String? questionId, String answer})> answers =
       [];
+  final Set<String> _expiredRequests = {};
+  Completer<void>? _heldLock;
 
   void openBatch(String requestId, List<String> qids) {
     _open[requestId] = qids.toSet();
+  }
+
+  /// Leaves the next answer's `clarify.lock` in flight so a test can interleave
+  /// a cancellation (and the gateway's late `status: expired` response) with it.
+  void holdNextLock() => _heldLock = Completer<void>();
+
+  /// Resolves a held lock the way `DesktopGatewayClient.respondToClarify` does
+  /// when the lock comes back `status: expired`: the answered question is gone,
+  /// so the request reports an empty remaining set before the send returns.
+  void expireHeldLock(String requestId) {
+    _expiredRequests.add(requestId);
+    _heldLock?.complete();
   }
 
   @override
@@ -39,7 +54,22 @@ class _BatchClarifySession implements GatewayTurnApplicationSession {
     String? questionId,
   }) async {
     answers.add((requestId: requestId, questionId: questionId, answer: answer));
+    final held = _heldLock;
+    if (held != null) {
+      await held.future;
+      _heldLock = null;
+    }
     final remaining = _open[requestId];
+    if (_expiredRequests.remove(requestId)) {
+      remaining?.clear();
+      emit(
+        StreamEvent(
+          type: 'clarify.remaining',
+          data: {'id': requestId, 'remaining': <String>[]},
+        ),
+      );
+      return true;
+    }
     if (remaining != null && questionId != null) {
       remaining.remove(questionId);
       emit(
@@ -228,6 +258,41 @@ void _deliverBatchQuestion(TestDesktopAsyncEventHook hook) {
   );
 }
 
+/// The gateway cancelling a server request while its card is open or while an
+/// answer is in flight (`DesktopGatewayClient` `request.cancel`).
+void _deliverRequestCancel(TestDesktopAsyncEventHook hook, String requestId) {
+  hook.handler?.call(
+    StreamEvent(
+      type: 'request.cancel',
+      data: {'id': requestId, 'method': 'clarify'},
+    ),
+  );
+}
+
+/// A later, unrelated clarify request: the chat must still present it.
+void _deliverSingleQuestion(
+  TestDesktopAsyncEventHook hook, {
+  required String requestId,
+  required String qid,
+  required String question,
+}) {
+  hook.handler?.call(
+    StreamEvent(
+      type: 'clarify.request',
+      data: {
+        'request_id': requestId,
+        'questions': [
+          {
+            'qid': qid,
+            'question': question,
+            'choices': ['Later A', 'Later B'],
+          },
+        ],
+      },
+    ),
+  );
+}
+
 void main() {
   testWidgets('answers every question of a batch clarify request', (
     tester,
@@ -264,6 +329,63 @@ void main() {
     expect(session.answers.last.questionId, 'q2');
     expect(session.answers.last.answer, 'Two A');
     expect(find.text('Second question?'), findsNothing);
+    expect(find.byType(ChatScreen), findsOneWidget);
+  });
+
+  testWidgets('a cancellation mid-answer closes the card only once', (
+    tester,
+  ) async {
+    final (session, hook) = await _pumpChat(tester);
+    session.openBatch('r1', ['q1', 'q2']);
+
+    _deliverBatchQuestion(hook);
+    await _pumpFrames(tester, const Duration(milliseconds: 200));
+    expect(find.text('First question?'), findsOneWidget);
+
+    // The lock stays in flight while the gateway cancels the request, so the
+    // cancellation closes the card the answer is being sent from.
+    session.holdNextLock();
+    await tester.tap(find.byKey(const Key('clarify-choice-1')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('clarify-continue')));
+    await _pumpFrames(tester);
+
+    _deliverRequestCancel(hook, 'r1');
+    // Deliberately not settled: the card's route is still animating out, which
+    // is the window a late answer used to pop in.
+    await _pumpFrames(tester, const Duration(milliseconds: 20));
+
+    // The lock resolves late, as `expired`. Its card is closed already, so the
+    // answer may not close a route: the surplus pop takes the chat screen (or
+    // the next question's card) with it.
+    session.expireHeldLock('r1');
+    await _pumpFrames(tester, const Duration(milliseconds: 300));
+
+    expect(find.text('First question?'), findsNothing);
+    expect(find.byType(ChatScreen), findsOneWidget);
+
+    // The conversation is still usable: a later request is presented and
+    // answered.
+    session.openBatch('r2', ['q3']);
+    _deliverSingleQuestion(
+      hook,
+      requestId: 'r2',
+      qid: 'q3',
+      question: 'Third question?',
+    );
+    await _pumpFrames(tester, const Duration(milliseconds: 200));
+    expect(find.text('Third question?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('clarify-choice-0')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('clarify-continue')));
+    await _pumpFrames(tester, const Duration(milliseconds: 200));
+
+    expect(session.answers, hasLength(2));
+    expect(session.answers.last.requestId, 'r2');
+    expect(session.answers.last.questionId, 'q3');
+    expect(session.answers.last.answer, 'Later A');
+    expect(find.text('Third question?'), findsNothing);
     expect(find.byType(ChatScreen), findsOneWidget);
   });
 }
