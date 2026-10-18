@@ -89,47 +89,58 @@ class _ChatDensitySettingsCardState extends State<ChatDensitySettingsCard> {
   }
 
   Future<void> _showPicker() {
+    bool saving = false;
     return showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.l10n.chat_density,
-                  style: Theme.of(sheetContext).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  context
-                      .l10n
-                      .compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins,
-                ),
-                const SizedBox(height: 8),
-                RadioGroup<ChatDensity>(
-                  groupValue: _density,
-                  onChanged: (value) {
-                    if (value != null) _select(sheetContext, value);
-                  },
-                  child: Column(
-                    children: [
-                      for (final density in ChatDensity.values)
-                        RadioListTile<ChatDensity>(
-                          value: density,
-                          title: Text(_densityLabel(context.l10n, density)),
-                          subtitle: Text(
-                            _densityDescription(context.l10n, density),
-                          ),
-                        ),
-                    ],
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.l10n.chat_density,
+                    style: Theme.of(sheetContext).textTheme.titleLarge,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  Text(
+                    context
+                        .l10n
+                        .compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins,
+                  ),
+                  const SizedBox(height: 8),
+                  RadioGroup<ChatDensity>(
+                    groupValue: _density,
+                    onChanged: (value) {
+                      if (value == null || saving) return;
+                      if (value != _density) setSheetState(() => saving = true);
+                      _select(sheetContext, value).whenComplete(() {
+                        if (sheetContext.mounted &&
+                            ModalRoute.of(sheetContext)?.isCurrent == true) {
+                          setSheetState(() => saving = false);
+                        }
+                      });
+                    },
+                    child: Column(
+                      children: [
+                        for (final density in ChatDensity.values)
+                          RadioListTile<ChatDensity>(
+                            value: density,
+                            enabled: !saving,
+                            title: Text(_densityLabel(context.l10n, density)),
+                            subtitle: Text(
+                              _densityDescription(context.l10n, density),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -145,6 +156,7 @@ class _ChatDensitySettingsCardState extends State<ChatDensitySettingsCard> {
           _densityLabel(context.l10n, _density),
         ),
         button: true,
+        onTap: _showPicker,
         child: ExcludeSemantics(
           child: ListTile(
             leading: const Icon(Icons.view_agenda_outlined),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,6 +29,35 @@ void main() {
 
     expect(find.textContaining('Compact'), findsOneWidget);
     expect(find.textContaining('Comfortable'), findsNothing);
+  });
+
+  testWidgets('the card opens the picker through its semantic tap action', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      testAppWithL10n(
+        Scaffold(body: ChatDensitySettingsCard(preferences: prefs)),
+      ),
+    );
+
+    final node = tester.getSemantics(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.label == 'Chat density: Comfortable',
+      ),
+    );
+    expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+    tester.binding.renderViews.single.owner!.semanticsOwner!.performAction(
+      node.id,
+      SemanticsAction.tap,
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.text('Compact'), findsOneWidget);
+    semantics.dispose();
   });
 
   testWidgets('choosing Compact stores it and broadcasts the change', (
@@ -119,6 +149,54 @@ void main() {
 
     // Settings, not the picker, must survive the late pop.
     expect(find.text('Chat density'), findsOneWidget);
+    expect(find.textContaining('Compact'), findsOneWidget);
+  });
+
+  testWidgets('a second radio tap cannot overtake the pending save', (
+    tester,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final pending = Completer<void>();
+    final saves = <ChatDensity>[];
+    await tester.pumpWidget(
+      testAppWithL10n(
+        Scaffold(
+          body: ChatDensitySettingsCard(
+            preferences: prefs,
+            testSaveDensity: (density) async {
+              saves.add(density);
+              await pending.future;
+              await ChatDensityStore(prefs).save(density);
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Chat density'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Compact'));
+    await tester.pump();
+    expect(
+      tester
+          .widget<RadioListTile<ChatDensity>>(
+            find.ancestor(
+              of: find.text('Comfortable'),
+              matching: find.byType(RadioListTile<ChatDensity>),
+            ),
+          )
+          .enabled,
+      isFalse,
+    );
+    await tester.tap(find.text('Comfortable'));
+    await tester.pump();
+    expect(saves, [ChatDensity.compact]);
+    expect(find.byType(BottomSheet), findsOneWidget);
+
+    pending.complete();
+    await tester.pumpAndSettle();
+    expect(prefs.getString(ChatDensity.preferenceKey), 'compact');
+    expect(find.byType(BottomSheet), findsNothing);
     expect(find.textContaining('Compact'), findsOneWidget);
   });
 }
