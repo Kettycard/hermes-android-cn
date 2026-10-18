@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config_backup.dart';
 import 'app_update_service.dart';
+import 'chat_density_preference.dart';
 import 'connection_manager.dart';
 import 'local_chat_pin_store.dart';
 
@@ -171,6 +172,11 @@ class ConfigBackupService {
       }
       applied++;
     }
+
+    // Preferences that are also held in memory must be re-read, not just
+    // written: the settings card and any open chat took their copy at build
+    // time and would otherwise keep showing the pre-import value.
+    ChatDensityStore(_preferences).read();
 
     return ConfigImportResult(
       connectionsAdded: added,

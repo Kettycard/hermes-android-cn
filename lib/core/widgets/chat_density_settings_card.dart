@@ -23,9 +23,16 @@ String _densityDescription(AppLocalizations l10n, ChatDensity density) {
 /// preference; connection, profile, and credential data never enter this
 /// namespace.
 class ChatDensitySettingsCard extends StatefulWidget {
-  const ChatDensitySettingsCard({required this.preferences, super.key});
+  const ChatDensitySettingsCard({
+    required this.preferences,
+    this.testSaveDensity,
+    super.key,
+  });
 
   final SharedPreferences preferences;
+
+  /// Lets tests hold the write open, to cover a picker dismissed mid-write.
+  final Future<void> Function(ChatDensity density)? testSaveDensity;
 
   @override
   State<ChatDensitySettingsCard> createState() =>
@@ -43,15 +50,42 @@ class _ChatDensitySettingsCardState extends State<ChatDensitySettingsCard> {
     _density = ChatDensity.fromStorage(
       widget.preferences.getString(ChatDensity.preferenceKey),
     );
+    // A restore can rewrite the preference while this card is mounted, and a
+    // rebuild does not rerun initState, so follow the broadcast as well.
+    chatDensitySelection.addListener(_handleSelectionChanged);
   }
 
-  Future<void> _select(ChatDensity density) async {
+  @override
+  void dispose() {
+    chatDensitySelection.removeListener(_handleSelectionChanged);
+    super.dispose();
+  }
+
+  void _handleSelectionChanged() {
+    if (!mounted) return;
+    final density = chatDensitySelection.value;
+    if (density == _density) return;
+    setState(() => _density = density);
+  }
+
+  Future<void> _save(ChatDensity density) {
+    final override = widget.testSaveDensity;
+    return override != null ? override(density) : _store.save(density);
+  }
+
+  /// [sheetContext] belongs to the picker, not to this card: the write is
+  /// asynchronous and the user can dismiss the picker while it is in flight, in
+  /// which case popping through the Settings route would close Settings itself.
+  Future<void> _select(BuildContext sheetContext, ChatDensity density) async {
+    final navigator = Navigator.of(sheetContext);
+    final route = ModalRoute.of(sheetContext);
     if (density != _density) {
-      await _store.save(density);
+      await _save(density);
       if (!mounted) return;
       setState(() => _density = density);
     }
-    if (mounted) Navigator.of(context).pop();
+    if (route == null || !route.isActive || !route.isCurrent) return;
+    navigator.pop();
   }
 
   Future<void> _showPicker() {
@@ -80,7 +114,7 @@ class _ChatDensitySettingsCardState extends State<ChatDensitySettingsCard> {
                 RadioGroup<ChatDensity>(
                   groupValue: _density,
                   onChanged: (value) {
-                    if (value != null) _select(value);
+                    if (value != null) _select(sheetContext, value);
                   },
                   child: Column(
                     children: [

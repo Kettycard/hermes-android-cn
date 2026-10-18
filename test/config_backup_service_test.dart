@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hermes_android/core/services/chat_density_preference.dart';
 import 'package:hermes_android/core/services/config_backup.dart';
 import 'package:hermes_android/core/services/config_backup_service.dart';
 import 'package:hermes_android/core/services/connection_manager.dart';
@@ -146,6 +147,23 @@ void main() {
       expect(restored.single.dashboardPassword, 'dash-pass');
       expect(restored.single.host, 'carlos-miniserver.ts.net');
       expect(restored.single.useHttps, isTrue);
+    });
+
+    test('import re-broadcasts a restored chat density', () async {
+      final (source, sourceManager, _) = await buildService(<String, Object>{
+        ChatDensity.preferenceKey: 'compact',
+      });
+      await sourceManager.saveConnection('Restored host', 'host', 8642, 'key');
+      final backup = await source.export(appVersion: 'test');
+
+      // The device was on the default before the import.
+      chatDensitySelection.value = ChatDensity.comfortable;
+      final (target, _, targetPrefs) = await buildService(<String, Object>{});
+
+      await target.import(backup, mode: ConfigImportMode.merge);
+
+      expect(targetPrefs.getString(ChatDensity.preferenceKey), 'compact');
+      expect(chatDensitySelection.value, ChatDensity.compact);
     });
 
     test('merge updates a connection already present by id', () async {
