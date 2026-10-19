@@ -3325,7 +3325,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           verbose: pending['_gateway_reasoning_verbose'] == true,
         ).applyTo(currentReasoning);
         candidate['_gateway_reasoning_verbose'] =
-            candidate['_gateway_reasoning_verbose'] == true ||
             pending['_gateway_reasoning_verbose'] == true;
       }
       _messages.removeAt(pendingIndex);
