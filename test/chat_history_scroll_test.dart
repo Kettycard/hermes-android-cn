@@ -548,6 +548,10 @@ void main() {
       testWidgets(
         'Remote completed preview preserves late $event and verbose display',
         (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(800, 1200);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.view.resetPhysicalSize);
           final remote = _ControlledRemotePrompt();
           await _pumpChat(
             tester,
@@ -561,6 +565,7 @@ void main() {
           await tester.pump();
           await remote.started.future;
           remote.emit('message.delta', {'text': 'Answer for $event'});
+          remote.emit('reasoning.delta', {'text': 'Partial reasoning. '});
           remote.emit('message.interim', {
             'text': 'Answer for $event',
             'already_streamed': true,
@@ -574,7 +579,11 @@ void main() {
           });
           remote.finish();
           await tester.pumpAndSettle();
-          expect(find.text('Reasoning for $event'), findsOneWidget);
+          final completedReasoning = event == 'reasoning.available'
+              ? 'Reasoning for $event'
+              : 'Partial reasoning. Reasoning for $event';
+          expect(find.text(completedReasoning), findsOneWidget);
+          expect(find.text('Partial reasoning. '), findsNothing);
           expect(
             find.text('Answer for $event', findRichText: true),
             findsOneWidget,

@@ -3164,6 +3164,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         final current = assistant['_gateway_reasoning']?.toString() ?? '';
         assistant['_gateway_reasoning'] = reasoning.applyTo(current);
         assistant['_gateway_reasoning_verbose'] = reasoning.verbose;
+        assistant['_gateway_reasoning_replaces'] =
+            assistant['_gateway_reasoning_replaces'] == true ||
+            reasoning.mode == GatewayReasoningEventMode.replace;
       });
       _scheduleStreamingFollow();
       return;
@@ -3314,9 +3317,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (pendingReasoning.isNotEmpty) {
         final currentReasoning =
             candidate['_gateway_reasoning']?.toString() ?? '';
-        candidate['_gateway_reasoning'] = currentReasoning.isEmpty
-            ? pendingReasoning
-            : '$currentReasoning\n\n$pendingReasoning';
+        candidate['_gateway_reasoning'] = GatewayReasoningUpdate(
+          text: pendingReasoning,
+          mode: pending['_gateway_reasoning_replaces'] == true
+              ? GatewayReasoningEventMode.replace
+              : GatewayReasoningEventMode.append,
+          verbose: pending['_gateway_reasoning_verbose'] == true,
+        ).applyTo(currentReasoning);
         candidate['_gateway_reasoning_verbose'] =
             candidate['_gateway_reasoning_verbose'] == true ||
             pending['_gateway_reasoning_verbose'] == true;
