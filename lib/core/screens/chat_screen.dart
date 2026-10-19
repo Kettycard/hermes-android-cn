@@ -3201,6 +3201,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _cancelGatewayServerRequest(event);
       return;
     }
+    if (event.type == 'message.start') {
+      _lastAssistantMessage()?.remove('_gateway_interim_boundary');
+      return;
+    }
     if (event.type == 'message.delta') {
       final token = event.data['text']?.toString() ?? '';
       if (token.isEmpty) return;
@@ -3238,6 +3242,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             'role': 'assistant',
             'content': '',
             '_gateway_pending_response': true,
+            '_gateway_interim_boundary': true,
           });
         }
       });
@@ -3250,7 +3255,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           event.data['text']?.toString() ??
           '';
       setState(() {
-        final assistant = _lastAssistantMessage();
+        final assistant = _completionAssistantMessage(event.data, completeText);
         if (assistant != null) {
           assistant['_gateway_pending_response'] = false;
           if (completeText.isNotEmpty) {
@@ -3272,6 +3277,44 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (event.type.startsWith('subagent.')) {
       _upsertSubagent(event.type, event.data);
     }
+  }
+
+  Map<String, dynamic>? _completionAssistantMessage(
+    Map<String, dynamic> data,
+    String completeText,
+  ) {
+    final pendingIndex = _messages.lastIndexWhere(
+      (message) => message['role'] == 'assistant',
+    );
+    if (pendingIndex < 0) return null;
+    final pending = _messages[pendingIndex];
+    if (pending['_gateway_pending_response'] != true ||
+        (pending['content']?.toString() ?? '').isNotEmpty) {
+      return pending;
+    }
+    final settlesBoundary =
+        pending['_gateway_interim_boundary'] == true &&
+        (data['response_previewed'] == true ||
+            data['response_transformed'] == true);
+    final reused = data['response_reused'] == true;
+    if (!settlesBoundary && !reused) return pending;
+
+    // A completion settles this turn's sealed preview, not the empty bubble
+    // prepared for a possible continuation. Never match an earlier user turn.
+    for (var index = pendingIndex - 1; index >= 0; index--) {
+      final candidate = _messages[index];
+      if (candidate['role'] == 'user') break;
+      if (candidate['role'] != 'assistant' ||
+          candidate['_gateway_interim'] != true ||
+          (candidate['content']?.toString() ?? '').isEmpty) {
+        continue;
+      }
+      if (!settlesBoundary && candidate['content'] != completeText) continue;
+      _messages.removeAt(pendingIndex);
+      candidate.remove('_gateway_interim');
+      return candidate;
+    }
+    return pending;
   }
 
   Map<String, dynamic>? _lastAssistantMessage() {

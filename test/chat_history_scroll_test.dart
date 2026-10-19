@@ -415,6 +415,114 @@ void main() {
     );
 
     testWidgets(
+      'Remote previewed or reused completion appears once per turn, not once per chat',
+      (tester) async {
+        final remote = _ControlledRemotePrompt();
+        await _pumpChat(
+          tester,
+          client: _ControlledChatHttpClient(const []),
+          connectionId: 'previewed-completion',
+          sessionId: 'previewed-completion',
+          remoteSubmit: remote.submit,
+        );
+
+        for (var turn = 1; turn <= 2; turn++) {
+          remote.started = Completer<void>();
+          await tester.enterText(find.byType(TextField), '3+4');
+          await tester.tap(find.byTooltip('Send'));
+          await tester.pump();
+          await remote.started.future;
+
+          remote.emit('message.start', {});
+          remote.emit('message.delta', {'text': 'Computing.'});
+          remote.emit('message.interim', {
+            'text': 'Computing.',
+            'already_streamed': true,
+          });
+          remote.emit('message.delta', {'text': '7'});
+          remote.emit('message.interim', {
+            'text': '7',
+            'already_streamed': true,
+          });
+          remote.emit('message.complete', {
+            'text': '7',
+            (turn == 1 ? 'response_previewed' : 'response_reused'): true,
+            'status': 'complete',
+          });
+          remote.finish();
+          await tester.pumpAndSettle();
+
+          expect(find.text('7', findRichText: true), findsNWidgets(turn));
+          expect(
+            find.text('Computing.', findRichText: true),
+            findsNWidgets(turn),
+          );
+          expect(find.byTooltip('Send'), findsOneWidget);
+        }
+      },
+    );
+
+    testWidgets(
+      'Remote rewritten completion updates its preview but a new message stays distinct',
+      (tester) async {
+        final remote = _ControlledRemotePrompt();
+        await _pumpChat(
+          tester,
+          client: _ControlledChatHttpClient(const []),
+          connectionId: 'rewritten-completion',
+          sessionId: 'rewritten-completion',
+          remoteSubmit: remote.submit,
+        );
+        await tester.enterText(find.byType(TextField), 'Rewrite the preview');
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pump();
+        await remote.started.future;
+
+        remote.emit('message.delta', {'text': 'Unfiltered preview'});
+        remote.emit('message.interim', {
+          'text': 'Unfiltered preview',
+          'already_streamed': true,
+        });
+        remote.emit('message.complete', {
+          'text': 'Final answer',
+          'response_transformed': true,
+        });
+        await tester.pump();
+        expect(
+          find.text('Unfiltered preview', findRichText: true),
+          findsNothing,
+        );
+        expect(find.text('Final answer', findRichText: true), findsOneWidget);
+
+        remote.finish();
+        await tester.pumpAndSettle();
+        remote.started = Completer<void>();
+        await tester.enterText(find.byType(TextField), 'A separate reply');
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pump();
+        await remote.started.future;
+        remote.emit('message.delta', {'text': 'Earlier interim'});
+        remote.emit('message.interim', {
+          'text': 'Earlier interim',
+          'already_streamed': true,
+        });
+        remote.emit('message.start', {});
+        remote.emit('message.complete', {
+          'text': 'Distinct reply',
+          'response_previewed': true,
+        });
+        remote.finish();
+        await tester.pumpAndSettle();
+        expect(find.text('Final answer', findRichText: true), findsOneWidget);
+        expect(
+          find.text('Earlier interim', findRichText: true),
+          findsOneWidget,
+        );
+        expect(find.text('Distinct reply', findRichText: true), findsOneWidget);
+      },
+    );
+
+    testWidgets(
       'end action stays above compact composer, IME, and attachment panel',
       (tester) async {
         tester.view.devicePixelRatio = 1;
