@@ -519,8 +519,69 @@ void main() {
           findsOneWidget,
         );
         expect(find.text('Distinct reply', findRichText: true), findsOneWidget);
+
+        remote.started = Completer<void>();
+        await tester.enterText(find.byType(TextField), 'Two separate replies');
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pump();
+        await remote.started.future;
+        remote.emit('message.delta', {'text': 'Repeated reply'});
+        remote.emit('message.interim', {
+          'text': 'Repeated reply',
+          'already_streamed': true,
+        });
+        remote.emit('message.start', {});
+        remote.emit('message.complete', {
+          'text': 'Repeated reply',
+          'response_reused': true,
+        });
+        remote.finish();
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Repeated reply', findRichText: true),
+          findsNWidgets(2),
+        );
       },
     );
+
+    for (final event in ['reasoning.delta', 'reasoning.available']) {
+      testWidgets(
+        'Remote completed preview preserves late $event and verbose display',
+        (tester) async {
+          final remote = _ControlledRemotePrompt();
+          await _pumpChat(
+            tester,
+            client: _ControlledChatHttpClient(const []),
+            connectionId: 'late-$event',
+            sessionId: 'late-$event',
+            remoteSubmit: remote.submit,
+          );
+          await tester.enterText(find.byType(TextField), 'Explain $event');
+          await tester.tap(find.byTooltip('Send'));
+          await tester.pump();
+          await remote.started.future;
+          remote.emit('message.delta', {'text': 'Answer for $event'});
+          remote.emit('message.interim', {
+            'text': 'Answer for $event',
+            'already_streamed': true,
+          });
+          remote.emit(event, {'text': 'Reasoning for $event', 'verbose': true});
+          await tester.pump(const Duration(milliseconds: 300));
+          expect(find.text('Reasoning for $event'), findsOneWidget);
+          remote.emit('message.complete', {
+            'text': 'Answer for $event',
+            'response_previewed': true,
+          });
+          remote.finish();
+          await tester.pumpAndSettle();
+          expect(find.text('Reasoning for $event'), findsOneWidget);
+          expect(
+            find.text('Answer for $event', findRichText: true),
+            findsOneWidget,
+          );
+        },
+      );
+    }
 
     testWidgets(
       'end action stays above compact composer, IME, and attachment panel',

@@ -3289,13 +3289,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (pendingIndex < 0) return null;
     final pending = _messages[pendingIndex];
     if (pending['_gateway_pending_response'] != true ||
-        (pending['content']?.toString() ?? '').isNotEmpty) {
+        (pending['content']?.toString() ?? '').isNotEmpty ||
+        pending['_gateway_interim_boundary'] != true) {
       return pending;
     }
     final settlesBoundary =
-        pending['_gateway_interim_boundary'] == true &&
-        (data['response_previewed'] == true ||
-            data['response_transformed'] == true);
+        data['response_previewed'] == true ||
+        data['response_transformed'] == true;
     final reused = data['response_reused'] == true;
     if (!settlesBoundary && !reused) return pending;
 
@@ -3310,6 +3310,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         continue;
       }
       if (!settlesBoundary && candidate['content'] != completeText) continue;
+      final pendingReasoning = pending['_gateway_reasoning']?.toString() ?? '';
+      if (pendingReasoning.isNotEmpty) {
+        final currentReasoning =
+            candidate['_gateway_reasoning']?.toString() ?? '';
+        candidate['_gateway_reasoning'] = currentReasoning.isEmpty
+            ? pendingReasoning
+            : '$currentReasoning\n\n$pendingReasoning';
+        candidate['_gateway_reasoning_verbose'] =
+            candidate['_gateway_reasoning_verbose'] == true ||
+            pending['_gateway_reasoning_verbose'] == true;
+      }
       _messages.removeAt(pendingIndex);
       candidate.remove('_gateway_interim');
       return candidate;
