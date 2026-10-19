@@ -12,6 +12,7 @@ import 'package:hermes_android/core/services/connection_manager.dart';
 import 'package:hermes_android/core/services/ws_client.dart';
 import 'package:hermes_android/core/utils/chat_history_scroll.dart';
 import 'package:hermes_android/core/widgets/chat_end_affordance.dart';
+import 'package:hermes_android/core/widgets/gateway_insight_card.dart';
 import 'package:hermes_android/l10n/app_localizations.dart';
 
 void main() {
@@ -565,14 +566,24 @@ void main() {
           await tester.pump();
           await remote.started.future;
           remote.emit('message.delta', {'text': 'Answer for $event'});
-          remote.emit('reasoning.delta', {'text': 'Partial reasoning. '});
+          final lateVerbose = event == 'reasoning.delta';
+          remote.emit('reasoning.delta', {
+            'text': 'Partial reasoning. ',
+            'verbose': !lateVerbose,
+          });
           remote.emit('message.interim', {
             'text': 'Answer for $event',
             'already_streamed': true,
           });
-          remote.emit(event, {'text': 'Reasoning for $event', 'verbose': true});
+          remote.emit(event, {
+            'text': 'Reasoning for $event',
+            'verbose': lateVerbose,
+          });
           await tester.pump(const Duration(milliseconds: 300));
-          expect(find.text('Reasoning for $event'), findsOneWidget);
+          expect(
+            find.text('Reasoning for $event'),
+            lateVerbose ? findsOneWidget : findsNothing,
+          );
           remote.emit('message.complete', {
             'text': 'Answer for $event',
             'response_previewed': true,
@@ -582,6 +593,16 @@ void main() {
           final completedReasoning = event == 'reasoning.available'
               ? 'Reasoning for $event'
               : 'Partial reasoning. Reasoning for $event';
+          expect(
+            tester
+                .widget<GatewayReasoningCard>(find.byType(GatewayReasoningCard))
+                .initiallyExpanded,
+            lateVerbose,
+          );
+          if (!lateVerbose) {
+            await tester.tap(find.text('Reasoning'));
+            await tester.pumpAndSettle();
+          }
           expect(find.text(completedReasoning), findsOneWidget);
           expect(find.text('Partial reasoning. '), findsNothing);
           expect(
