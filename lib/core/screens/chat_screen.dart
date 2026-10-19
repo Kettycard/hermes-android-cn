@@ -3164,6 +3164,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         final current = assistant['_gateway_reasoning']?.toString() ?? '';
         assistant['_gateway_reasoning'] = reasoning.applyTo(current);
         assistant['_gateway_reasoning_verbose'] = reasoning.verbose;
+        assistant['_gateway_reasoning_replaces'] =
+            assistant['_gateway_reasoning_replaces'] == true ||
+            reasoning.mode == GatewayReasoningEventMode.replace;
       });
       _scheduleStreamingFollow();
       return;
@@ -3199,6 +3202,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
     if (event.type == 'request.cancel') {
       _cancelGatewayServerRequest(event);
+      return;
+    }
+    if (event.type == 'message.start') {
+      _lastAssistantMessage()?.remove('_gateway_interim_boundary');
       return;
     }
     if (event.type == 'message.delta') {
@@ -3238,6 +3245,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             'role': 'assistant',
             'content': '',
             '_gateway_pending_response': true,
+            '_gateway_interim_boundary': true,
           });
         }
       });
@@ -3250,7 +3258,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           event.data['text']?.toString() ??
           '';
       setState(() {
-        final assistant = _lastAssistantMessage();
+        final assistant = _completionAssistantMessage(
+          event.data,
+          event.data['text']?.toString() ?? completeText,
+        );
         if (assistant != null) {
           assistant['_gateway_pending_response'] = false;
           if (completeText.isNotEmpty) {
@@ -3272,6 +3283,60 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (event.type.startsWith('subagent.')) {
       _upsertSubagent(event.type, event.data);
     }
+  }
+
+  Map<String, dynamic>? _completionAssistantMessage(
+    Map<String, dynamic> data,
+    String rawCompleteText,
+  ) {
+    final pendingIndex = _messages.lastIndexWhere(
+      (message) => message['role'] == 'assistant',
+    );
+    if (pendingIndex < 0) return null;
+    final pending = _messages[pendingIndex];
+    if (pending['_gateway_pending_response'] != true ||
+        (pending['content']?.toString() ?? '').isNotEmpty ||
+        pending['_gateway_interim_boundary'] != true) {
+      return pending;
+    }
+    // Flags describe the final response, but do not identify which interim
+    // it settles. Only an exact raw-text match may consume a sealed interim.
+    if (data['response_previewed'] != true &&
+        data['response_transformed'] != true &&
+        data['response_reused'] != true) {
+      return pending;
+    }
+    if (rawCompleteText.isEmpty) return pending;
+
+    // A completion settles a matching preview from this turn, not the empty
+    // bubble prepared for a continuation or distinct interim commentary.
+    for (var index = pendingIndex - 1; index >= 0; index--) {
+      final candidate = _messages[index];
+      if (candidate['role'] == 'user') break;
+      if (candidate['role'] != 'assistant' ||
+          candidate['_gateway_interim'] != true ||
+          candidate['content'] != rawCompleteText) {
+        continue;
+      }
+      final pendingReasoning = pending['_gateway_reasoning']?.toString() ?? '';
+      if (pendingReasoning.isNotEmpty) {
+        final currentReasoning =
+            candidate['_gateway_reasoning']?.toString() ?? '';
+        candidate['_gateway_reasoning'] = GatewayReasoningUpdate(
+          text: pendingReasoning,
+          mode: pending['_gateway_reasoning_replaces'] == true
+              ? GatewayReasoningEventMode.replace
+              : GatewayReasoningEventMode.append,
+          verbose: pending['_gateway_reasoning_verbose'] == true,
+        ).applyTo(currentReasoning);
+        candidate['_gateway_reasoning_verbose'] =
+            pending['_gateway_reasoning_verbose'] == true;
+      }
+      _messages.removeAt(pendingIndex);
+      candidate.remove('_gateway_interim');
+      return candidate;
+    }
+    return pending;
   }
 
   Map<String, dynamic>? _lastAssistantMessage() {
