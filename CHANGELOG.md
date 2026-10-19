@@ -4,6 +4,22 @@ All notable changes since v1.0.7 are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The [README](README.md)
 shows only the three latest releases.
 
+## [2.1.23] - 2026-10-20
+
+### Fixed
+
+- A final Gateway answer that was already previewed no longer appears as a
+  duplicate assistant bubble. Completion reconciles against the matching
+  interim in the current turn; distinct commentary and late reasoning remain
+  visible (PR #153).
+
+### Thanks
+
+- [@krotname](https://github.com/krotname) (Andrei Ovcharenko) for the
+  previewed-completion fix and widget regressions in PR #153. A maintainer
+  follow-up added exact-match reconciliation and further edge-case tests while
+  preserving the contributor's commits.
+
 ## [2.1.22] - 2026-10-19
 
 ### Added

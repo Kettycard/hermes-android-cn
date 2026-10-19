@@ -1,4 +1,4 @@
-# Hermes Android — v2.1.22
+# Hermes Android — v2.1.23
 
 Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — chat with your Hermes sessions from a phone or tablet over local Wi-Fi or a private Tailscale network.
 
@@ -14,16 +14,16 @@ Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — ch
 
 ## Current release
 
-- Version: **2.1.22** (build 2165)
+- Version: **2.1.23** (build 2166)
 - Package: `com.hermesagent.hermes_android`
 - Recommended APK for modern phones: ARM64 release build from the
   [Releases](https://github.com/rusty4444/hermes-android/releases) page.
 - Production builds are signed with a private release keystore. Debug APKs
   signed with the Android debug certificate remain available for testing
   under the `com.hermesagent.hermes_android.dev` package ID.
-- v2.1.22 includes contributions from [@igitur](https://github.com/igitur)
-  and [@dadofsambonzuki](https://github.com/dadofsambonzuki), with maintainer
-  follow-up fixes. See [Credits](#credits) and the [changelog](CHANGELOG.md).
+- v2.1.23 fixes duplicate previewed answers with work by
+  [@krotname](https://github.com/krotname) and a maintainer follow-up. See
+  [Credits](#credits) and the [changelog](CHANGELOG.md).
 - The app checks [GitHub Releases](https://github.com/rusty4444/hermes-android/releases)
   on ordinary launches. An answered check limits network requests to once
   every 12 hours; offline attempts may retry at the next launch. A newer build
@@ -74,6 +74,12 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete release history and
 [docs/HERMESAPK_DEVELOPMENT_LOG.md](docs/HERMESAPK_DEVELOPMENT_LOG.md) for the
 sanitized implementation and validation record.
 
+## What's new in v2.1.23
+
+- **No duplicate previewed answers** — final Gateway responses settle onto
+  the matching interim bubble without losing separate commentary or late
+  reasoning (PR #153, [@krotname](https://github.com/krotname)).
+
 ## What's new in v2.1.22
 
 - **Compact chat density** — choose Settings → Appearance → Chat density for
@@ -98,17 +104,6 @@ sanitized implementation and validation record.
   arrive. After Home has loaded, Chats reuses its complete session list instead
   of scanning it again. Older blocked work, local pins, and Quick Chat archive
   records remain available (PR #146).
-
-## What's new in v2.1.20
-
-- **Advisory update checks** — an ordinary launch checks GitHub Releases
-  when no answered check was made in the last 12 hours. It offers a newer
-  build without downloading or installing it. **Later** asks again next launch;
-  **Skip this version** waits for a newer release. Shares, Quick Chat shortcuts,
-  and tasks opened while the check runs are not interrupted. Settings → About
-  has an immediate check and a switch to turn launch checks off. The release
-  prompt never loads remote note images automatically (PR #143,
-  [@igitur](https://github.com/igitur)).
 
 ## Features
 
@@ -467,7 +462,7 @@ cp build/app/outputs/flutter-apk/app-*-release.apk release-apks/
 block in `android/app/build.gradle.kts` derives per-ABI codes as
 `base * 10 + ABI code` (armeabi-v7a = 1, arm64-v8a = 2, x86_64 = 3), so the
 codes stay ordered armeabi-v7a < arm64-v8a < x86_64 as fdroiddata requires.
-For v2.1.22, base `2165` therefore produces codes `21651`/`21652`/`21653`.
+For v2.1.23, base `2166` therefore produces codes `21661`/`21662`/`21663`.
 CI reads the completed arm64 APK with `aapt` and fails if that relationship
 drifts. Release-floor checks continue to apply to the base value and must not
 be weakened to rely on the ABI code.
@@ -578,6 +573,9 @@ lib/
 
 ## Credits
 
+- **krotname** (Andrei Ovcharenko) — fixed duplicate final answers after
+  Gateway interim previews, including late reasoning and widget regressions
+  (PR #153, v2.1.23). A maintainer follow-up handles exact-match edge cases.
 - **simplaerai-sv** — kept the attachment composer, multiline captions, and
   Send button usable above the keyboard across narrow, landscape, and
   large-text layouts, with focused widget regressions in PR #139 (v2.1.18).
