@@ -464,7 +464,7 @@ void main() {
     );
 
     testWidgets(
-      'Remote rewritten completion updates its preview but a new message stays distinct',
+      'Remote distinct transformed completion preserves commentary and a new message stays distinct',
       (tester) async {
         final remote = _ControlledRemotePrompt();
         await _pumpChat(
@@ -491,7 +491,7 @@ void main() {
         await tester.pump();
         expect(
           find.text('Unfiltered preview', findRichText: true),
-          findsNothing,
+          findsOneWidget,
         );
         expect(find.text('Final answer', findRichText: true), findsOneWidget);
 
@@ -541,6 +541,84 @@ void main() {
         expect(
           find.text('Repeated reply', findRichText: true),
           findsNWidgets(2),
+        );
+      },
+    );
+
+    testWidgets(
+      'Remote previewed completion matches an earlier interim without discarding later commentary',
+      (tester) async {
+        final remote = _ControlledRemotePrompt();
+        await _pumpChat(
+          tester,
+          client: _ControlledChatHttpClient(const []),
+          connectionId: 'earlier-interim-preview',
+          sessionId: 'earlier-interim-preview',
+          remoteSubmit: remote.submit,
+        );
+        await tester.enterText(find.byType(TextField), 'Explain the result');
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pump();
+        await remote.started.future;
+
+        remote.emit('message.start', {});
+        remote.emit('message.delta', {'text': 'First answer'});
+        remote.emit('message.interim', {
+          'text': 'First answer',
+          'already_streamed': true,
+        });
+        remote.emit('message.delta', {'text': 'Later commentary'});
+        remote.emit('message.interim', {
+          'text': 'Later commentary',
+          'already_streamed': true,
+        });
+        // No message.start between the interims and completion: the gateway
+        // only sends it at turn start, so this exercises the real boundary.
+        remote.emit('message.complete', {
+          'text': 'First answer',
+          'response_previewed': true,
+        });
+        remote.finish();
+        await tester.pumpAndSettle();
+        expect(find.text('First answer', findRichText: true), findsOneWidget);
+        expect(
+          find.text('Later commentary', findRichText: true),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'Remote rendered completion matches raw interim text, then displays rendered text',
+      (tester) async {
+        final remote = _ControlledRemotePrompt();
+        await _pumpChat(
+          tester,
+          client: _ControlledChatHttpClient(const []),
+          connectionId: 'rendered-interim-preview',
+          sessionId: 'rendered-interim-preview',
+          remoteSubmit: remote.submit,
+        );
+        await tester.enterText(find.byType(TextField), 'Render the result');
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pump();
+        await remote.started.future;
+        remote.emit('message.delta', {'text': 'Raw answer'});
+        remote.emit('message.interim', {
+          'text': 'Raw answer',
+          'already_streamed': true,
+        });
+        remote.emit('message.complete', {
+          'text': 'Raw answer',
+          'rendered': 'Rendered answer',
+          'response_previewed': true,
+        });
+        remote.finish();
+        await tester.pumpAndSettle();
+        expect(find.text('Raw answer', findRichText: true), findsNothing);
+        expect(
+          find.text('Rendered answer', findRichText: true),
+          findsOneWidget,
         );
       },
     );

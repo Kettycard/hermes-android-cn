@@ -3258,7 +3258,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           event.data['text']?.toString() ??
           '';
       setState(() {
-        final assistant = _completionAssistantMessage(event.data, completeText);
+        final assistant = _completionAssistantMessage(
+          event.data,
+          event.data['text']?.toString() ?? completeText,
+        );
         if (assistant != null) {
           assistant['_gateway_pending_response'] = false;
           if (completeText.isNotEmpty) {
@@ -3284,7 +3287,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Map<String, dynamic>? _completionAssistantMessage(
     Map<String, dynamic> data,
-    String completeText,
+    String rawCompleteText,
   ) {
     final pendingIndex = _messages.lastIndexWhere(
       (message) => message['role'] == 'assistant',
@@ -3296,23 +3299,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         pending['_gateway_interim_boundary'] != true) {
       return pending;
     }
-    final settlesBoundary =
-        data['response_previewed'] == true ||
-        data['response_transformed'] == true;
-    final reused = data['response_reused'] == true;
-    if (!settlesBoundary && !reused) return pending;
+    // Flags describe the final response, but do not identify which interim
+    // it settles. Only an exact raw-text match may consume a sealed interim.
+    if (data['response_previewed'] != true &&
+        data['response_transformed'] != true &&
+        data['response_reused'] != true) {
+      return pending;
+    }
+    if (rawCompleteText.isEmpty) return pending;
 
-    // A completion settles this turn's sealed preview, not the empty bubble
-    // prepared for a possible continuation. Never match an earlier user turn.
+    // A completion settles a matching preview from this turn, not the empty
+    // bubble prepared for a continuation or distinct interim commentary.
     for (var index = pendingIndex - 1; index >= 0; index--) {
       final candidate = _messages[index];
       if (candidate['role'] == 'user') break;
       if (candidate['role'] != 'assistant' ||
           candidate['_gateway_interim'] != true ||
-          (candidate['content']?.toString() ?? '').isEmpty) {
+          candidate['content'] != rawCompleteText) {
         continue;
       }
-      if (!settlesBoundary && candidate['content'] != completeText) continue;
       final pendingReasoning = pending['_gateway_reasoning']?.toString() ?? '';
       if (pendingReasoning.isNotEmpty) {
         final currentReasoning =
