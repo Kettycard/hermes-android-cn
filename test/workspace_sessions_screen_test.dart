@@ -265,6 +265,90 @@ void main() {
     expect(find.text('Daily driver'), findsOneWidget);
   });
 
+  testWidgets('cached chats render while metadata is still loading', (
+    tester,
+  ) async {
+    final metadata = Completer<WorkspaceSessionsData>();
+    final chat = _session('s1', 'Cached conversation');
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        theme: hermesTheme(Brightness.dark),
+        home: WorkspaceSessionsScreen(
+          title: 'Chats',
+          view: WorkspaceSessionView.all,
+          embedded: true,
+          initialData: WorkspaceSessionsData(
+            sessions: [chat],
+            projectsKnown: false,
+            isPartial: true,
+          ),
+          load: () => metadata.future,
+          onOpenSession: (_) {},
+        ),
+      ),
+    );
+
+    expect(find.text('Cached conversation'), findsOneWidget);
+    expect(find.byType(LoadingSkeleton), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Unassigned'));
+    await tester.pump();
+    expect(find.text('Cached conversation'), findsNothing);
+    expect(find.byType(EmptyState), findsNothing);
+
+    metadata.complete(
+      WorkspaceSessionsData(sessions: [chat], claimedSessionIds: const {}),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Cached conversation'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
+
+  testWidgets('late preview appears but cannot replace completed Chats data', (
+    tester,
+  ) async {
+    final complete = Completer<WorkspaceSessionsData>();
+    final preview = WorkspaceSessionsData(
+      sessions: [_session('s1', 'First chat')],
+      projectsKnown: false,
+      isPartial: true,
+    );
+    Widget browser(WorkspaceSessionsData? initialData) => MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      theme: hermesTheme(Brightness.dark),
+      home: WorkspaceSessionsScreen(
+        key: const ValueKey('chats'),
+        title: 'Chats',
+        view: WorkspaceSessionView.all,
+        embedded: true,
+        initialData: initialData,
+        load: () => complete.future,
+        onOpenSession: (_) {},
+      ),
+    );
+
+    await tester.pumpWidget(browser(null));
+    expect(find.byType(LoadingSkeleton), findsOneWidget);
+    await tester.pumpWidget(browser(preview));
+    expect(find.text('First chat'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+    complete.complete(
+      WorkspaceSessionsData(
+        sessions: [_session('s1', 'First chat'), _session('s2', 'Older chat')],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Older chat'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    await tester.pumpWidget(browser(preview));
+    expect(find.text('Older chat'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
+
   group('the Chats chip filters', () {
     final now = DateTime.fromMillisecondsSinceEpoch(1750000000 * 1000);
     final recent = _session('s1', 'Fresh', lastActive: 1750000000);

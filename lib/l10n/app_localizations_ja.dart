@@ -2377,4 +2377,79 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get attached_file => '添付ファイル';
+
+  @override
+  String get pin_on_this_device => 'この端末でピン留め';
+
+  @override
+  String get unpin_on_this_device => 'この端末でピン留めを解除';
+
+  @override
+  String get pinned_on_this_device => 'この端末でピン留め中';
+
+  @override
+  String get could_not_save_chat_pin => 'この端末でチャットのピン留めを保存できませんでした';
+
+  @override
+  String get update_available => '更新があります';
+
+  @override
+  String get a_newer_hermes_android_build_is_available_on_github =>
+      'GitHub で新しい Hermes Android ビルドが公開されています。';
+
+  @override
+  String get release_notes => 'リリースノート';
+
+  @override
+  String get view_release => 'リリースを見る';
+
+  @override
+  String get skip_this_version => 'このバージョンをスキップ';
+
+  @override
+  String get later => 'あとで';
+
+  @override
+  String get check_for_updates => 'アップデートを確認';
+
+  @override
+  String get check_for_updates_on_launch => '起動時にアップデートを確認';
+
+  @override
+  String get you_re_on_the_latest_version => 'すでに最新バージョンです。';
+
+  @override
+  String get couldn_t_check_for_updates => 'アップデートを確認できませんでした。';
+
+  @override
+  String get chat_density => 'チャットの密度';
+
+  @override
+  String chat_density_2(Object label) {
+    return 'チャットの密度: $label';
+  }
+
+  @override
+  String get chat_density_comfortable => 'ゆったり';
+
+  @override
+  String get chat_density_compact => 'コンパクト';
+
+  @override
+  String get chat_density_comfortable_description =>
+      '各メッセージの上に送信者ラベルが付いた、ゆったりとした吹き出し。';
+
+  @override
+  String get chat_density_compact_description =>
+      'ラベルなしの詰まった吹き出しで、より多くのメッセージを表示します。';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      'コンパクトでは「You」「Hermes」のラベルを外し、吹き出しの余白・間隔・左右のマージンを詰めます。';
 }

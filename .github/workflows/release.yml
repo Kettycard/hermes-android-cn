@@ -28,6 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify README release window
+        run: python3 scripts/check_readme_release_window.py
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -68,7 +71,7 @@ jobs:
       - name: Verify release identity and upgrade versionCode
         env:
           MINIMUM_INSTALLED_VERSION_CODE: '2127'
-          REQUIRED_BASE_VERSION_CODE: '2156'
+          REQUIRED_BASE_VERSION_CODE: '2166'
         run: |
           python3 - <<'PY'
           import os

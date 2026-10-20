@@ -120,8 +120,8 @@ void main() {
 
       expect(items, hasLength(3));
       expect(items[0], isA<Map<String, dynamic>>());
-      final group = items[1] as List<GatewayToolActivity>;
-      expect(group.map((activity) => activity.name), ['terminal']);
+      final group = items[1] as ChatToolActivityGroup;
+      expect(group.activities.map((activity) => activity.name), ['terminal']);
       expect((items[2] as Map<String, dynamic>)['_display_content'], 'done');
     });
 
@@ -136,8 +136,8 @@ void main() {
       );
 
       expect(items, hasLength(2));
-      final group = items[0] as List<GatewayToolActivity>;
-      expect(group.map((activity) => activity.name), [
+      final group = items[0] as ChatToolActivityGroup;
+      expect(group.activities.map((activity) => activity.name), [
         'read_file',
         'write_file',
       ]);
@@ -172,7 +172,7 @@ void main() {
       expect(items, hasLength(2));
       expect(items[0], isA<Map<String, dynamic>>());
       expect(
-        (items[1] as List<GatewayToolActivity>).single.name,
+        (items[1] as ChatToolActivityGroup).activities.single.name,
         'search_files',
       );
     });
@@ -208,7 +208,7 @@ void main() {
 
       expect(items, hasLength(1));
       expect(
-        (items.single as List<GatewayToolActivity>).single.name,
+        (items.single as ChatToolActivityGroup).activities.single.name,
         'terminal',
       );
     });
@@ -320,7 +320,7 @@ void main() {
         toolActivities: [_tool('terminal')],
       );
 
-      expect(items[0], isA<List<GatewayToolActivity>>());
+      expect(items[0], isA<ChatToolActivityGroup>());
       expect(items[1], isA<ChatReasoningItem>());
       expect(items[2], isA<Map<String, dynamic>>());
     });

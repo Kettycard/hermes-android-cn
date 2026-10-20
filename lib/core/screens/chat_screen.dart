@@ -18,6 +18,7 @@ import '../services/connection_manager.dart';
 import '../services/attachment_draft_service.dart';
 import '../services/composer_draft_store.dart';
 import '../services/chat_model_override_store.dart';
+import '../services/chat_density_preference.dart';
 import '../services/desktop_gateway_client.dart';
 import '../services/gateway_turn_application_controller.dart';
 import '../services/gateway_turn_coordinator.dart';
@@ -37,6 +38,7 @@ import '../models/gateway_insight.dart';
 import '../models/gateway_sensitive_prompt.dart';
 import '../models/gateway_turn_contract.dart';
 import '../models/projects_tree_overview.dart';
+import '../services/tool_activity_group_pins.dart';
 import '../utils/chat_display_items.dart';
 import '../utils/chat_history_scroll.dart';
 import '../utils/message_content.dart';
@@ -344,6 +346,10 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _messages = [];
   final List<GatewayToolActivity> _toolActivities = [];
+
+  /// Expansion choices for tool-activity cards, keyed by group id so they
+  /// survive the list reordering and row eviction that a streaming turn causes.
+  final ToolActivityGroupPins _toolActivityPins = ToolActivityGroupPins();
   final List<GatewaySubagentActivity> _subagentActivities = [];
   final Map<String, GatewayNotification> _gatewayNotifications = {};
   final Map<String, Timer> _notificationTimers = {};
@@ -431,6 +437,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final List<_PendingClarifyPrompt> _clarifyPromptQueue = [];
   _PendingClarifyPrompt? _activeClarifyPrompt;
   bool _clarifyPromptRouteOpen = false;
+  Route<bool>? _clarifyPromptRoute;
+  bool _clarifyPromptClosing = false;
+
+  /// Clarify prompts whose answer the user submitted from their own card.
+  ///
+  /// The batch transport locks one answer at a time and reports the remaining
+  /// question ids while that answer is still in flight, so the reconcile sees
+  /// the card's own question leave the pending set. Without this record it
+  /// would close the card a second time, and that surplus pop takes the route
+  /// underneath with it — the chat screen on the legacy transport, or the next
+  /// question of the batch once its card is open — leaving the batch
+  /// unanswerable until the chat is re-entered.
+  final Set<String> _selfAnsweredClarifyIdentities = {};
 
   // Voice input / spoken replies
   final FlutterTts _flutterTts = FlutterTts();
@@ -442,6 +461,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   // Verbose mode
   bool _verboseMode = false;
+
+  // Chat density (bubble geometry and sender labels)
+  ChatDensity _chatDensity = chatDensitySelection.value;
 
   // Scroll management
   final _scrollController = ScrollController();
@@ -578,6 +600,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     unawaited(_refreshProjectName());
     unawaited(_initializeChat());
     _loadVerboseMode();
+    _loadChatDensity();
+    chatDensitySelection.addListener(_onChatDensityChanged);
     _initVoice();
     _recoverLostImage();
     _scrollController.addListener(_onScroll);
@@ -662,9 +686,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     setState(() => _verboseMode = prefs.getBool('verbose_mode') ?? false);
   }
 
+  Future<void> _loadChatDensity() async {
+    final prefs = await SharedPreferences.getInstance();
+    final density = ChatDensityStore(prefs).read();
+    if (!mounted || density == _chatDensity) return;
+    setState(() => _chatDensity = density);
+  }
+
+  /// Settings can change the density while this chat is already mounted, so the
+  /// selection is broadcast rather than read once per launch.
+  void _onChatDensityChanged() {
+    final density = chatDensitySelection.value;
+    if (!mounted || density == _chatDensity) return;
+    setState(() => _chatDensity = density);
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    chatDensitySelection.removeListener(_onChatDensityChanged);
     _projectNameRefreshGeneration += 1;
     pendingNotificationApprovals.removeListener(
       _consumePendingNotificationApproval,
@@ -2203,35 +2243,46 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Dashboard client used to list models when no Desktop Gateway is
-  /// configured. Listing needs only `api/model/info` + `api/model/options`
-  /// over REST — the gateway WebSocket is required solely to push a
-  /// per-session override, which [_setSessionModel] skips when no gateway is
-  /// present (the chosen model rides on the chat request instead).
-  DashboardClient _modelListingClient() => DashboardClient(
-    host: widget.connection.host,
-    port: widget.connection.dashboardPort,
-    pathPrefix: widget.connection.dashboardPrefix ?? '',
-    proxied: widget.connection.dashboardProxied,
-    useHttps: widget.connection.useHttps,
-    username: widget.connection.dashboardUsername,
-    password: widget.connection.dashboardPassword,
-  );
-
   Future<void> _showModelSelector() async {
-    if (_pendingReattachResync) return;
-    final desktopGateway = _desktopGateway;
-    final restClient = desktopGateway == null ? _modelListingClient() : null;
-
+    if (_pendingReattachResync || _loadingModelOptions) return;
     setState(() => _loadingModelOptions = true);
     try {
-      final results = await Future.wait([
-        desktopGateway?.getModelInfo() ?? restClient!.getModelInfo(),
-        desktopGateway?.getModelOptions() ?? restClient!.getModelOptions(),
-      ]);
+      await _sessionModelRestore;
       if (!mounted || _pendingReattachResync) return;
-      final modelInfo = results[0];
-      final choices = _parseModelChoices(results[1]);
+      final desktopGateway = _desktopGateway;
+
+      // API-server-only connections deliberately stay on port 8642. The API
+      // server exposes both the model inventory and the current session model;
+      // no Dashboard client or :9119 transport is needed for the picker.
+      late final Map<String, dynamic> sessionOrModelInfo;
+      late final Map<String, dynamic> modelOptions;
+      if (desktopGateway != null) {
+        final results = await Future.wait([
+          desktopGateway.getModelInfo(),
+          desktopGateway.getModelOptions(),
+        ]);
+        sessionOrModelInfo = results[0];
+        modelOptions = results[1];
+      } else if (widget.session.isLocalDraft) {
+        // A new chat deliberately has no server row until its first turn (or
+        // until a selected model is persisted below), so an exact-session GET
+        // would be a guaranteed 404. The API model inventory contains the
+        // profile default needed to initialise the picker.
+        sessionOrModelInfo = const {};
+        modelOptions = await _client.getModelOptions();
+      } else {
+        final results = await Future.wait([
+          _client.getSession(widget.session.id),
+          _client.getModelOptions(),
+        ]);
+        sessionOrModelInfo = results[0];
+        modelOptions = results[1];
+      }
+      if (!mounted || _pendingReattachResync) return;
+      final modelInfo = desktopGateway != null
+          ? sessionOrModelInfo
+          : modelOptions;
+      final choices = _parseModelChoices(modelOptions);
       if (choices.isEmpty) {
         throw StateError(
           'The active profile did not return any selectable models.',
@@ -2253,12 +2304,30 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       }
       if (!mounted || _pendingReattachResync) return;
 
-      var selectedChoice = choices.firstWhere(
-        (choice) =>
-            choice.model == (_sessionModel ?? widget.session.model) &&
-            (_sessionProvider == null || choice.provider == _sessionProvider),
-        orElse: () => choices.first,
+      final apiSessionModel =
+          desktopGateway == null && !widget.session.isLocalDraft
+          ? sessionOrModelInfo['model']?.toString().trim()
+          : null;
+      final selectedModel = apiSessionModel?.isNotEmpty == true
+          ? apiSessionModel!
+          : (_sessionModel ??
+                (widget.session.isLocalDraft
+                    ? modelOptions['model']?.toString().trim()
+                    : null) ??
+                widget.session.model);
+      final providerHint =
+          _sessionProvider ??
+          (widget.session.isLocalDraft
+              ? modelOptions['provider']?.toString().trim()
+              : desktopGateway != null
+              ? modelInfo['provider']?.toString().trim()
+              : null);
+      var selectedChoice = _initialModelChoice(
+        choices,
+        selectedModel: selectedModel,
+        provider: providerHint,
       );
+      final providerChoiceRequired = selectedChoice == null;
       var selectedEffort = currentEffort;
       final selection = await showModalBottomSheet<_ModelSelection>(
         context: context,
@@ -2278,6 +2347,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       '${modelInfo['provider'] == null ? '' : ' • ${modelInfo['provider']}'}',
                     ),
                   ),
+                  if (providerChoiceRequired)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: Text(
+                        'This model is available from multiple providers. Choose a provider to continue.',
+                      ),
+                    ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                     child: InputDecorator(
@@ -2314,8 +2390,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       itemBuilder: (context, index) {
                         final choice = choices[index];
                         final selected =
-                            choice.model == selectedChoice.model &&
-                            choice.provider == selectedChoice.provider;
+                            choice.model == selectedChoice?.model &&
+                            choice.provider == selectedChoice?.provider;
                         return ListTile(
                           leading: Icon(
                             selected
@@ -2345,13 +2421,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         ),
                         const SizedBox(width: 8),
                         FilledButton(
-                          onPressed: () => Navigator.pop(
-                            sheetContext,
-                            _ModelSelection(
-                              choice: selectedChoice,
-                              reasoningEffort: selectedEffort,
-                            ),
-                          ),
+                          onPressed: selectedChoice == null
+                              ? null
+                              : () => Navigator.pop(
+                                  sheetContext,
+                                  _ModelSelection(
+                                    choice: selectedChoice!,
+                                    reasoningEffort: selectedEffort,
+                                  ),
+                                ),
                           child: Text(context.l10n.apply_to_this_chat),
                         ),
                       ],
@@ -2407,16 +2485,37 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return choices;
   }
 
+  _ModelChoice? _initialModelChoice(
+    List<_ModelChoice> choices, {
+    required String selectedModel,
+    String? provider,
+  }) {
+    final candidates = choices
+        .where((choice) => choice.model == selectedModel)
+        .toList(growable: false);
+    final cleanProvider = provider?.trim() ?? '';
+    if (cleanProvider.isNotEmpty) {
+      for (final choice in candidates) {
+        if (choice.provider == cleanProvider) return choice;
+      }
+    }
+    if (candidates.length == 1) return candidates.single;
+    if (candidates.length > 1) {
+      // GET /api/sessions/{id} intentionally omits model_config, so an API
+      // session whose model id exists under multiple providers has no
+      // authoritative provider unless this client saved one. Never guess the
+      // first provider: require an explicit tap before Apply is enabled.
+      return null;
+    }
+    return choices.isEmpty ? null : choices.first;
+  }
+
   Future<void> _setSessionModel(_ModelSelection selection) async {
     final desktopGateway = _desktopGateway;
     if (_changingModel || _pendingReattachResync) return;
     final choice = selection.choice;
     setState(() => _changingModel = true);
     try {
-      // Without a gateway there is no session-scoped RPC to push the override
-      // to, so the selection stays local and is sent as the `model` field on
-      // each chat request instead. Reasoning effort is gateway-only and is
-      // simply not applied in that mode.
       if (desktopGateway != null) {
         await desktopGateway.setSessionModel(
           sessionId: widget.session.id,
@@ -2427,6 +2526,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         await desktopGateway.setSessionReasoning(
           sessionId: widget.session.id,
           effort: selection.reasoningEffort,
+        );
+      } else {
+        // The API Server owns this session, so persist the same per-session
+        // lock over :8642 instead of activating the Dashboard transport.
+        // Reasoning effort remains a Desktop Gateway-only control.
+        await _client.setSessionModel(
+          sessionId: widget.session.id,
+          provider: choice.provider,
+          model: choice.model,
+          createSessionIfMissing: widget.session.isLocalDraft,
         );
       }
       final store = await _chatModelStore;
@@ -2567,10 +2676,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     await _gateway.sendMessageStreaming(
       message: text,
       sessionId: widget.session.id,
-      // Carry the per-chat override on the request. The API server resolves
-      // `model` per call, so this reproduces session-scoped model selection
-      // without needing the gateway WebSocket to hold session state.
+      // The OpenAI-compatible endpoint does not consume the API session's
+      // persisted Browser lock. Carry both ids on API-only turns so duplicate
+      // model names cannot silently fall back to another provider. Desktop
+      // Gateway keeps its existing model-only request behaviour.
       model: _sessionModelOverride ? _sessionModel : null,
+      provider: _desktopGateway == null && _sessionModelOverride
+          ? _sessionProvider
+          : null,
       history: history,
       imageDataUrl: imageDataUrl,
       onToken: (token) {
@@ -3051,6 +3164,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         final current = assistant['_gateway_reasoning']?.toString() ?? '';
         assistant['_gateway_reasoning'] = reasoning.applyTo(current);
         assistant['_gateway_reasoning_verbose'] = reasoning.verbose;
+        assistant['_gateway_reasoning_replaces'] =
+            assistant['_gateway_reasoning_replaces'] == true ||
+            reasoning.mode == GatewayReasoningEventMode.replace;
       });
       _scheduleStreamingFollow();
       return;
@@ -3086,6 +3202,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
     if (event.type == 'request.cancel') {
       _cancelGatewayServerRequest(event);
+      return;
+    }
+    if (event.type == 'message.start') {
+      _lastAssistantMessage()?.remove('_gateway_interim_boundary');
       return;
     }
     if (event.type == 'message.delta') {
@@ -3125,6 +3245,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             'role': 'assistant',
             'content': '',
             '_gateway_pending_response': true,
+            '_gateway_interim_boundary': true,
           });
         }
       });
@@ -3137,7 +3258,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           event.data['text']?.toString() ??
           '';
       setState(() {
-        final assistant = _lastAssistantMessage();
+        final assistant = _completionAssistantMessage(
+          event.data,
+          event.data['text']?.toString() ?? completeText,
+        );
         if (assistant != null) {
           assistant['_gateway_pending_response'] = false;
           if (completeText.isNotEmpty) {
@@ -3159,6 +3283,60 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (event.type.startsWith('subagent.')) {
       _upsertSubagent(event.type, event.data);
     }
+  }
+
+  Map<String, dynamic>? _completionAssistantMessage(
+    Map<String, dynamic> data,
+    String rawCompleteText,
+  ) {
+    final pendingIndex = _messages.lastIndexWhere(
+      (message) => message['role'] == 'assistant',
+    );
+    if (pendingIndex < 0) return null;
+    final pending = _messages[pendingIndex];
+    if (pending['_gateway_pending_response'] != true ||
+        (pending['content']?.toString() ?? '').isNotEmpty ||
+        pending['_gateway_interim_boundary'] != true) {
+      return pending;
+    }
+    // Flags describe the final response, but do not identify which interim
+    // it settles. Only an exact raw-text match may consume a sealed interim.
+    if (data['response_previewed'] != true &&
+        data['response_transformed'] != true &&
+        data['response_reused'] != true) {
+      return pending;
+    }
+    if (rawCompleteText.isEmpty) return pending;
+
+    // A completion settles a matching preview from this turn, not the empty
+    // bubble prepared for a continuation or distinct interim commentary.
+    for (var index = pendingIndex - 1; index >= 0; index--) {
+      final candidate = _messages[index];
+      if (candidate['role'] == 'user') break;
+      if (candidate['role'] != 'assistant' ||
+          candidate['_gateway_interim'] != true ||
+          candidate['content'] != rawCompleteText) {
+        continue;
+      }
+      final pendingReasoning = pending['_gateway_reasoning']?.toString() ?? '';
+      if (pendingReasoning.isNotEmpty) {
+        final currentReasoning =
+            candidate['_gateway_reasoning']?.toString() ?? '';
+        candidate['_gateway_reasoning'] = GatewayReasoningUpdate(
+          text: pendingReasoning,
+          mode: pending['_gateway_reasoning_replaces'] == true
+              ? GatewayReasoningEventMode.replace
+              : GatewayReasoningEventMode.append,
+          verbose: pending['_gateway_reasoning_verbose'] == true,
+        ).applyTo(currentReasoning);
+        candidate['_gateway_reasoning_verbose'] =
+            pending['_gateway_reasoning_verbose'] == true;
+      }
+      _messages.removeAt(pendingIndex);
+      candidate.remove('_gateway_interim');
+      return candidate;
+    }
+    return pending;
   }
 
   Map<String, dynamic>? _lastAssistantMessage() {
@@ -3376,6 +3554,67 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // Unresolved, not answered: keep the entry for a later retry.
     } finally {
       _answeringPendingApprovals.remove(key);
+    }
+  }
+
+  /// Sends the answer the user submitted from a clarify card.
+  ///
+  /// Records the prompt as self-answered for the duration of the send so the
+  /// remaining-questions reconcile does not close the card's route a second
+  /// time (see [_selfAnsweredClarifyIdentities]).
+  Future<void> _answerClarifyPrompt(
+    GatewayClarifyRequest request,
+    String answer,
+  ) async {
+    _selfAnsweredClarifyIdentities.add(request.identityKey);
+    try {
+      await _respondToGatewayClarify(
+        requestId: request.requestId,
+        questionId: request.questionId,
+        answer: answer,
+      );
+    } catch (_) {
+      // A failed send keeps the card open for a retry, so the reconcile may
+      // own the route again.
+      _selfAnsweredClarifyIdentities.remove(request.identityKey);
+      rethrow;
+    }
+  }
+
+  /// Whether the open clarify card still belongs to [request].
+  ///
+  /// A `request.cancel` arriving while `clarify.lock` is pending closes the
+  /// card itself, and the drain can open the next question's card before the
+  /// late answer (the gateway reports `status: expired`) resolves. A card may
+  /// only close the route it still owns: popping otherwise takes whatever is
+  /// on top — the chat screen, or the next question's card — with it.
+  bool _ownsClarifyPromptRoute(GatewayClarifyRequest request) {
+    return _clarifyPromptRouteOpen &&
+        !_clarifyPromptClosing &&
+        _activeClarifyPrompt?.request.identityKey == request.identityKey;
+  }
+
+  void _closeClarifyPromptRoute() {
+    if (_clarifyPromptClosing) return;
+    final route = _clarifyPromptRoute;
+    if (route == null) {
+      // showDialog pushed the route but its builder has not run yet.
+      // Wait for its identity rather than popping an unrelated top route.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _clarifyPromptRouteOpen && _clarifyPromptRoute != null) {
+          _closeClarifyPromptRoute();
+        }
+      });
+      return;
+    }
+    _clarifyPromptClosing = true;
+    final navigator = Navigator.of(context, rootNavigator: true);
+    if (route.isCurrent) {
+      navigator.pop(false);
+    } else {
+      // A newer approval may be above clarify. Expiring clarify must not
+      // dismiss that independent request or send an unintended denial.
+      navigator.removeRoute(route, false);
     }
   }
 
@@ -3687,7 +3926,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
       if (_activeClarifyPrompt?.request.requestId == requestId &&
           _clarifyPromptRouteOpen) {
-        Navigator.of(context, rootNavigator: true).pop(false);
+        _closeClarifyPromptRoute();
       } else if (_activeClarifyPrompt?.request.requestId != requestId) {
         _cancelledInteractiveRequestIds.remove(requestId);
       }
@@ -3718,9 +3957,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         remaining.contains(active?.request.questionId)) {
       return;
     }
+    // An answer the user sent from this card closes its own route once the
+    // lock lands. The reconcile is for questions resolved elsewhere, so leave
+    // the route alone here instead of popping it twice.
+    if (_selfAnsweredClarifyIdentities.remove(active!.request.identityKey)) {
+      return;
+    }
     _cancelledInteractiveRequestIds.add(requestId);
     if (_clarifyPromptRouteOpen) {
-      Navigator.of(context, rootNavigator: true).pop(false);
+      _closeClarifyPromptRoute();
     } else {
       _activeClarifyPrompt = null;
       _cancelledInteractiveRequestIds.remove(requestId);
@@ -3786,16 +4031,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final responded = await showDialog<bool>(
         context: context,
         barrierDismissible: true,
-        builder: (_) => GatewayClarifyDialog(
-          request: pending.request,
-          onRespond: (answer) => _respondToGatewayClarify(
-            requestId: pending.request.requestId,
-            questionId: pending.request.questionId,
-            answer: answer,
-          ),
-        ),
+        builder: (dialogContext) {
+          _clarifyPromptRoute = ModalRoute.of<bool>(dialogContext);
+          return GatewayClarifyDialog(
+            request: pending.request,
+            onRespond: (answer) =>
+                _answerClarifyPrompt(pending.request, answer),
+            canCloseRoute: () => _ownsClarifyPromptRoute(pending.request),
+          );
+        },
       );
       _clarifyPromptRouteOpen = false;
+      _clarifyPromptRoute = null;
+      _clarifyPromptClosing = false;
+      _selfAnsweredClarifyIdentities.remove(pending.request.identityKey);
       final wasCancelled = _cancelledInteractiveRequestIds.remove(
         pending.request.requestId,
       );
@@ -4002,7 +4251,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         );
       }
       if (idx >= 0) {
-        _toolActivities[idx] = _toolActivities[idx].merge(update);
+        final previous = _toolActivities[idx];
+        _toolActivities[idx] = previous.merge(update);
+        if (previous.toolId == null && update.toolId != null) {
+          _toolActivityPins.alias(previous.identity, 'tool:${update.toolId}');
+        }
       } else {
         _toolActivities.add(update);
       }
@@ -4140,23 +4393,31 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   ),
                 ),
               Expanded(
-                child: Stack(
-                  children: [
-                    Positioned.fill(child: _buildBody()),
-                    if (_endAffordanceController.isVisible)
-                      Positioned(
-                        right: 12,
-                        bottom: 12,
-                        child: ChatEndAffordance(
-                          newMessageCount:
-                              _endAffordanceController.newMessageCount,
-                          onPressed: _goToEnd,
+                child: LayoutBuilder(
+                  builder: (context, viewport) => Column(
+                    children: [
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            Positioned.fill(child: _buildBody()),
+                            if (_endAffordanceController.isVisible)
+                              Positioned(
+                                right: 12,
+                                bottom: 12,
+                                child: ChatEndAffordance(
+                                  newMessageCount:
+                                      _endAffordanceController.newMessageCount,
+                                  onPressed: _goToEnd,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                  ],
+                      _buildInputBar(availableHeight: viewport.maxHeight),
+                    ],
+                  ),
                 ),
               ),
-              _buildInputBar(),
             ],
           ),
         ),
@@ -4188,9 +4449,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildInputBar() {
+  Widget _buildInputBar({required double availableHeight}) {
+    const minimumControlsHeight = 56.0;
+    final composerMaxHeight = availableHeight <= minimumControlsHeight
+        ? availableHeight
+        : (availableHeight * 0.85)
+              .clamp(minimumControlsHeight, availableHeight)
+              .toDouble();
     return Container(
       key: const Key('chat-input-bar'),
+      // Leave some transcript visible when space permits. At very small
+      // heights, the fixed controls take priority and extras scroll away.
+      constraints: BoxConstraints(maxHeight: composerMaxHeight),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -4202,128 +4472,152 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (_gatewayTurnStatus != null && (_sending || _streaming))
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(4, 2, 4, 2),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.secondaryContainer.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const SizedBox.square(
-                      dimension: 14,
-                      child: CircularProgressIndicator(strokeWidth: 1.8),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _gatewayTurnStatus!.text,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
+                    if (_gatewayTurnStatus != null && (_sending || _streaming))
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .secondaryContainer
+                              .withValues(alpha: 0.55),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const SizedBox.square(
+                              dimension: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.8,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _gatewayTurnStatus!.text,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
+                        child: Semantics(
+                          label: context.l10n.choose_chat_model,
+                          value: _sessionModel ?? widget.session.model,
+                          button: true,
+                          enabled:
+                              !(_sending ||
+                                  _streaming ||
+                                  _pendingReattachResync ||
+                                  _loadingModelOptions ||
+                                  _changingModel),
+                          excludeSemantics: true,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 48),
+                            child: TextButton.icon(
+                              onPressed:
+                                  (_sending ||
+                                      _streaming ||
+                                      _pendingReattachResync ||
+                                      _loadingModelOptions ||
+                                      _changingModel)
+                                  ? null
+                                  : _showModelSelector,
+                              icon: _loadingModelOptions || _changingModel
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.tune, size: 18),
+                              label: Text(
+                                context.l10n.model_scope_label(
+                                  _sessionModel ?? widget.session.model,
+                                  _sessionModelOverride
+                                      ? context.l10n.this_chat
+                                      : context.l10n.profile_default,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
+                    if (_attachmentDrafts.isNotEmpty)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Semantics(
+                          label: context.l10n.attachment_drafts,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              // Scaffold has already subtracted the keyboard and app bar.
+                              maxHeight: availableHeight * 0.32,
+                            ),
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: _attachmentDrafts.length,
+                              itemBuilder: (context, index) =>
+                                  AttachmentDraftTile(
+                                    draft: _attachmentDrafts[index],
+                                    index: index,
+                                    total: _attachmentDrafts.length,
+                                    busy: _sending,
+                                    onMovePrevious: () => _moveAttachment(
+                                      _attachmentDrafts[index],
+                                      -1,
+                                    ),
+                                    onMoveNext: () => _moveAttachment(
+                                      _attachmentDrafts[index],
+                                      1,
+                                    ),
+                                    onRetry: () => _retryAttachment(
+                                      _attachmentDrafts[index],
+                                    ),
+                                    onRemove: () => _removeAttachment(
+                                      _attachmentDrafts[index],
+                                    ),
+                                  ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (_voiceComposer.listening)
+                      VoiceComposerIndicator(
+                        controller: _voiceComposer,
+                        onStop: () => unawaited(_voiceComposer.stop()),
+                        onCancel: () => unawaited(_voiceComposer.cancel()),
+                      ),
                   ],
                 ),
               ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
-                child: Semantics(
-                  label: context.l10n.choose_chat_model,
-                  value: _sessionModel ?? widget.session.model,
-                  button: true,
-                  enabled:
-                      !(_sending ||
-                          _streaming ||
-                          _pendingReattachResync ||
-                          _loadingModelOptions ||
-                          _changingModel),
-                  excludeSemantics: true,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 48),
-                    child: TextButton.icon(
-                      onPressed:
-                          (_sending ||
-                              _streaming ||
-                              _pendingReattachResync ||
-                              _loadingModelOptions ||
-                              _changingModel)
-                          ? null
-                          : _showModelSelector,
-                      icon: _loadingModelOptions || _changingModel
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.tune, size: 18),
-                      label: Text(
-                        context.l10n.model_scope_label(
-                          _sessionModel ?? widget.session.model,
-                          _sessionModelOverride
-                              ? context.l10n.this_chat
-                              : context.l10n.profile_default,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ),
-            if (_attachmentDrafts.isNotEmpty)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Semantics(
-                  label: context.l10n.attachment_drafts,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.sizeOf(context).height * 0.32,
-                    ),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: _attachmentDrafts.length,
-                      itemBuilder: (context, index) => AttachmentDraftTile(
-                        draft: _attachmentDrafts[index],
-                        index: index,
-                        total: _attachmentDrafts.length,
-                        busy: _sending,
-                        onMovePrevious: () =>
-                            _moveAttachment(_attachmentDrafts[index], -1),
-                        onMoveNext: () =>
-                            _moveAttachment(_attachmentDrafts[index], 1),
-                        onRetry: () =>
-                            _retryAttachment(_attachmentDrafts[index]),
-                        onRemove: () =>
-                            _removeAttachment(_attachmentDrafts[index]),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            if (_voiceComposer.listening)
-              VoiceComposerIndicator(
-                controller: _voiceComposer,
-                onStop: () => unawaited(_voiceComposer.stop()),
-                onCancel: () => unawaited(_voiceComposer.cancel()),
-              ),
             Row(
               children: [
                 Semantics(
@@ -4355,30 +4649,35 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   child: Semantics(
                     label: context.l10n.message,
                     textField: true,
-                    child: TextField(
-                      key: const Key('chat-message-composer'),
-                      controller: _textController,
-                      decoration: InputDecoration(
-                        hintText: context.l10n.message_hermes,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        isDense: true,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: (availableHeight * 0.30).clamp(48.0, 160.0),
                       ),
-                      minLines: 1,
-                      maxLines: 5,
-                      textCapitalization: TextCapitalization.sentences,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.send,
-                      enabled:
-                          !_transcriptLoadBlocksComposer &&
-                          !_streaming &&
-                          !_pendingReattachResync,
-                      onSubmitted: (_) => _sendMessage(),
+                      child: TextField(
+                        key: const Key('chat-message-composer'),
+                        controller: _textController,
+                        decoration: InputDecoration(
+                          hintText: context.l10n.message_hermes,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          isDense: true,
+                        ),
+                        minLines: 1,
+                        maxLines: 5,
+                        textCapitalization: TextCapitalization.sentences,
+                        keyboardType: TextInputType.multiline,
+                        textInputAction: TextInputAction.send,
+                        enabled:
+                            !_transcriptLoadBlocksComposer &&
+                            !_streaming &&
+                            !_pendingReattachResync,
+                        onSubmitted: (_) => _sendMessage(),
+                      ),
                     ),
                   ),
                 ),
@@ -4518,6 +4817,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       verbose: _verboseMode,
     );
 
+    // The stored row is the durable anchor once available. Carry a pin made
+    // while this group was still streaming across the tool-id → row-id handoff.
+    for (final group in displayMessages.whereType<ChatToolActivityGroup>()) {
+      final toolId = group.activities.first.toolId;
+      if (group.id.startsWith('message:') &&
+          toolId != null &&
+          toolId.isNotEmpty) {
+        _toolActivityPins.alias('tool:$toolId', group.id);
+      }
+    }
+
     return NotificationListener<ScrollMetricsNotification>(
       onNotification: (notification) {
         _syncEndAffordance(notification.metrics, clearUnreadAtEnd: false);
@@ -4527,15 +4837,24 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         onNotification: _handleScrollNotification,
         child: ListView.builder(
           controller: _scrollController,
-          padding: const EdgeInsets.only(bottom: 4),
+          padding: EdgeInsets.only(bottom: _chatDensity.listEndPadding),
           itemCount: displayMessages.length,
           itemBuilder: (context, index) {
             final item = displayMessages[index];
 
-            if (item is List<GatewayToolActivity>) {
+            if (item is ChatToolActivityGroup) {
               return GatewayActivityCard(
-                activities: item,
+                key: ValueKey<String>('tool-activity-${item.id}'),
+                activities: item.activities,
                 verbose: _verboseMode,
+                pinnedExpansion: _toolActivityPins[item.id],
+                onPinChanged: (expanded) {
+                  _toolActivityPins.pin(item.id, expanded);
+                  final toolId = item.activities.first.toolId;
+                  if (toolId != null && toolId.isNotEmpty) {
+                    _toolActivityPins.alias(item.id, 'tool:$toolId');
+                  }
+                },
               );
             }
             if (item is List<GatewaySubagentActivity>) {
@@ -4562,6 +4881,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               content: content,
               isUser: isUser,
               verbose: _verboseMode,
+              density: _chatDensity,
               metadata: msg,
               mediaReferencesFinal: msg['_gateway_pending_response'] != true,
               mediaFilesClient: isUser
@@ -4611,6 +4931,7 @@ class MessageBubble extends StatelessWidget {
   final String content;
   final bool isUser;
   final bool verbose;
+  final ChatDensity density;
   final Map<String, dynamic> metadata;
   final Future<void> Function()? onReadAloud;
   final VoidCallback? onEdit;
@@ -4628,6 +4949,7 @@ class MessageBubble extends StatelessWidget {
     required this.content,
     required this.isUser,
     this.verbose = false,
+    this.density = ChatDensity.comfortable,
     this.metadata = const {},
     this.onReadAloud,
     this.onEdit,
@@ -4984,33 +5306,36 @@ class MessageBubble extends StatelessWidget {
       onLongPress: () => _showActions(context),
       behavior: HitTestBehavior.opaque,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        margin: density.bubbleMargin,
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width - 80,
+          maxWidth: MediaQuery.of(context).size.width - density.maxWidthInset,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: density.bubblePadding,
         decoration: BoxDecoration(
           color: isUser ? userBubbleColor : assistantBubbleColor,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(density.bubbleRadius),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             // Role header keeps user and assistant prose clearly separated.
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                isUser ? 'You' : 'Hermes',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: isUser
-                      ? hermesUserMessageForeground.withValues(alpha: 0.75)
-                      : theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.4,
+            // Compact density drops it: alignment and colour already identify
+            // the speaker, and the label costs a line per message.
+            if (density.showsSenderLabel)
+              Padding(
+                padding: EdgeInsets.only(bottom: density.senderLabelGap),
+                child: Text(
+                  isUser ? 'You' : 'Hermes',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: isUser
+                        ? hermesUserMessageForeground.withValues(alpha: 0.75)
+                        : theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
+                  ),
                 ),
               ),
-            ),
             // Verbose metadata header
             if (metaLines.isNotEmpty) ...[
               Container(
@@ -5050,7 +5375,7 @@ class MessageBubble extends StatelessWidget {
             // MEDIA: — the contract is assistant-side delivery, and quoted
             // tags in a prompt must stay verbatim.
             ..._renderContent(theme, isUser, assistantTextColor),
-            const SizedBox(height: 4),
+            SizedBox(height: density.bodyBottomGap),
           ],
         ),
       ),
@@ -5058,7 +5383,15 @@ class MessageBubble extends StatelessWidget {
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: bubble,
+      // Compact drops the visible label, but the speaker is still information:
+      // keep it for screen readers instead of removing it from the tree.
+      child: density.showsSenderLabel
+          ? bubble
+          : Semantics(
+              container: true,
+              label: isUser ? 'You' : 'Hermes',
+              child: bubble,
+            ),
     );
   }
 }

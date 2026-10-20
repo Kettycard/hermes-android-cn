@@ -37,7 +37,7 @@ jobs:
       - name: Fetch upstream
         run: |
           git remote add upstream "$UPSTREAM_REPO"
-          git fetch upstream main --tags
+          git fetch upstream main --no-tags
           echo "upstream head: $(git rev-parse --short upstream/main)"
 
       - name: Merge upstream into localized main

@@ -10,7 +10,6 @@ import 'package:hermes_android/core/widgets/home_pane.dart';
 import 'support/l10n_test_utils.dart';
 import 'package:hermes_android/l10n/app_localizations.dart';
 
-
 /// A fixed clock so the window boundaries the digest owns stay asserted
 /// rather than approximated.
 final _now = DateTime.utc(2026, 8, 27, 12, 0, 0);
@@ -41,6 +40,7 @@ Session _session({
 Future<void> _pump(
   WidgetTester tester, {
   required HomeSessionsLoader loadSessions,
+  HomeProgressiveSessionsLoader? loadProgressiveSessions,
   Map<String, String> attention = const {},
   Set<String> running = const {},
   Map<String, String> projectNames = const {},
@@ -59,6 +59,7 @@ Future<void> _pump(
       home: Scaffold(
         body: HomePane(
           loadSessions: loadSessions,
+          loadProgressiveSessions: loadProgressiveSessions,
           attention: attention,
           running: running,
           projectNames: projectNames,
@@ -75,6 +76,76 @@ void main() {
 
   setUpAll(() async {
     l10n = await loadTestL10n();
+  });
+  testWidgets('refresh keeps old blocked work and ignores stale completions', (
+    tester,
+  ) async {
+    final oldRefresh = Completer<List<Session>>();
+    final callbacks = <void Function(List<Session>?)>[];
+    var reads = 0;
+    await _pump(
+      tester,
+      loadSessions: () async => const [],
+      loadProgressiveSessions: (update) {
+        callbacks.add(update);
+        reads++;
+        if (reads == 2) return oldRefresh.future;
+        return Future.value([
+          _session(id: 'recent-$reads', title: 'Recent $reads'),
+        ]);
+      },
+      attention: const {'old': 'Approval required'},
+    );
+    await tester.pump();
+    callbacks.single([
+      _session(id: 'old', title: 'Old blocked'),
+      _session(id: 'recent-1', title: 'Recent 1'),
+    ]);
+    await tester.pump();
+    expect(find.text('Old blocked'), findsOneWidget);
+
+    final state = tester.state<HomePaneState>(find.byType(HomePane));
+    unawaited(state.refresh()); // Delayed first refresh.
+    unawaited(state.refresh()); // Newer refresh wins.
+    await tester.pump();
+    expect(find.text('Recent 3'), findsOneWidget);
+    expect(find.text('Old blocked'), findsOneWidget);
+    oldRefresh.complete([_session(id: 'stale', title: 'Stale first page')]);
+    callbacks[1]([_session(id: 'stale-bg', title: 'Stale background')]);
+    await tester.pump();
+    expect(find.text('Stale first page'), findsNothing);
+    expect(find.text('Stale background'), findsNothing);
+
+    callbacks[2](null); // Background failure keeps the usable digest.
+    await tester.pump();
+    expect(find.text('Old blocked'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text(l10n.could_not_reach_hermes), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    callbacks[2]([_session(id: 'late', title: 'Disposed result')]);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('an empty first slice is not mistaken for an empty Home', (
+    tester,
+  ) async {
+    late void Function(List<Session>?) finishScan;
+    await _pump(
+      tester,
+      loadSessions: () async => const [],
+      loadProgressiveSessions: (update) async {
+        finishScan = update;
+        return const [];
+      },
+    );
+    await tester.pump();
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.byType(EmptyState), findsNothing);
+
+    finishScan(null);
+    await tester.pump();
+    expect(find.byType(ErrorState), findsOneWidget);
+    expect(find.byType(EmptyState), findsNothing);
   });
   testWidgets('holds a loading skeleton until the first read lands', (
     tester,

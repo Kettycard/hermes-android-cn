@@ -3,7 +3,10 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config_backup.dart';
+import 'app_update_service.dart';
+import 'chat_density_preference.dart';
 import 'connection_manager.dart';
+import 'local_chat_pin_store.dart';
 
 /// How an imported backup is applied to the connections already on the device.
 enum ConfigImportMode {
@@ -56,6 +59,9 @@ class ConfigBackupService {
     'voice_name',
     'voice_locale',
     'app_text_size_preference',
+    'chat_density',
+    AppUpdateService.checkOnLaunchKey,
+    AppUpdateService.skippedVersionKey,
   };
 
   /// Prefixes for per-connection and per-chat preferences, which are keyed by
@@ -65,6 +71,7 @@ class ConfigBackupService {
     'chat_model_override.',
     'excluded_session_sources_',
     'chat_spaces_v1_',
+    LocalChatPinStore.keyPrefix,
   ];
 
   final ConnectionManager _connectionManager;
@@ -165,6 +172,11 @@ class ConfigBackupService {
       }
       applied++;
     }
+
+    // Preferences that are also held in memory must be re-read, not just
+    // written: the settings card and any open chat took their copy at build
+    // time and would otherwise keep showing the pre-import value.
+    ChatDensityStore(_preferences).read();
 
     return ConfigImportResult(
       connectionsAdded: added,

@@ -1,4 +1,4 @@
-# Hermes Android — v2.1.16
+# Hermes Android — v2.1.23
 
 Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — chat with your Hermes sessions from a phone or tablet over local Wi-Fi or a private Tailscale network.
 
@@ -14,13 +14,25 @@ Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — ch
 
 ## Current release
 
-- Version: **2.1.16** (build 2156)
+- Version: **2.1.23** (build 2166)
 - Package: `com.hermesagent.hermes_android`
 - Recommended APK for modern phones: ARM64 release build from the
   [Releases](https://github.com/rusty4444/hermes-android/releases) page.
 - Production builds are signed with a private release keystore. Debug APKs
   signed with the Android debug certificate remain available for testing
   under the `com.hermesagent.hermes_android.dev` package ID.
+- v2.1.23 fixes duplicate previewed answers with work by
+  [@krotname](https://github.com/krotname) and a maintainer follow-up. See
+  [Credits](#credits) and the [changelog](CHANGELOG.md).
+- The app checks [GitHub Releases](https://github.com/rusty4444/hermes-android/releases)
+  on ordinary launches. An answered check limits network requests to once
+  every 12 hours; offline attempts may retry at the next launch. A newer build
+  is offered in a dialog. It never downloads or installs APKs itself.
+  **Later** asks again on the next launch; **Skip this version** stays quiet
+  until a newer version is published. Shares and Quick Chat shortcuts are not
+  interrupted. In **Settings → About**, use **Check for updates** for an
+  immediate check or disable **Check for updates on launch**. These choices
+  are included in app backups; HTTP response caches are not.
 - Previous upstream releases remain available from the
   [Releases](https://github.com/rusty4444/hermes-android/releases) page.
 
@@ -36,6 +48,10 @@ Android client for [Hermes Agent](https://hermes-agent.nousresearch.com/) — ch
 - Legacy REST remains fail-closed to one image and does not expose multi-select.
 - Per-chat model and thinking effort without changing the profile default.
 - Search, Rename, Branch, and Delete for remote conversations.
+- Pin and unpin chats on this device from the Chats action menu. Local pins
+  stay above the dated chat list, including when a chat has moved past the
+  first page; they do not change Hermes's server-side pinned flag or another
+  device's ordering. Pins are saved per connection and included in app backups.
 - Native approval, sudo/secret, clarification, reasoning, tool activity,
   notifications, background results, reviews, and subagent status.
 - Persistent reconnect/session resume and defensive retry handling.
@@ -54,212 +70,40 @@ while Android is backgrounded, the app re-syncs that session's server-side
 history on resume. The durable exactly-once recovery path activates only when a
 gateway explicitly advertises the compatible recovery contract.
 
-See [CHANGELOG.md](CHANGELOG.md) for the complete `.16` change list and
+See [CHANGELOG.md](CHANGELOG.md) for the complete release history and
 [docs/HERMESAPK_DEVELOPMENT_LOG.md](docs/HERMESAPK_DEVELOPMENT_LOG.md) for the
 sanitized implementation and validation record.
 
-## What's new in v2.1.16
+## What's new in v2.1.23
 
-- **Correct Project labels in chat** — the sticky chat header now resolves its
-  authoritative server-side Project after opening, reconnecting, or binding a
-  new draft to its durable session, without delaying turn recovery.
+- **No duplicate previewed answers** — final Gateway responses settle onto
+  the matching interim bubble without losing separate commentary or late
+  reasoning (PR #153, [@krotname](https://github.com/krotname)).
 
-## What's new in v2.1.15
+## What's new in v2.1.22
 
-- **Desktop-parity notifications** — receive configurable Android notifications
-  for completed and failed turns, approvals, clarifications, plugin events,
-  credit changes, and other background activity, then return safely to the
-  owning chat.
-- **Inline delivered files** — valid `MEDIA:` references become authenticated,
-  tappable file cards without turning streamed fragments or code examples into
-  downloads.
-- **Drafts survive navigation and restarts** — unsent composer text is kept per
-  saved connection and chat, while live session chips refresh only when their
-  pane is visible.
+- **Compact chat density** — choose Settings → Appearance → Chat density for
+  tighter bubbles and fewer visual sender labels; speaker information remains
+  available to screen readers. The setting updates open chats and survives
+  backup restore (PR #147, @igitur).
+- **Tool cards respect your choice** — collapse a running activity card and it
+  stays closed as tools arrive or the row moves; expand it and it stays open
+  after the turn finishes (PR #148, @igitur).
+- **Batch clarifications stay in chat** — answering one question no longer
+  dismisses the conversation or the next question, even when a cancellation or
+  approval overlaps it (PR #145, @dadofsambonzuki).
 
-## What's new in v2.1.14
+## Optimisation Release — what's new in v2.1.21
 
-- **Navigation labels stay readable** — bottom-bar labels now fit on one line
-  on narrow phones at every supported text size and across every shipped
-  locale, with concise Russian bar labels that preserve the full pane titles.
-
-## What's new in v2.1.13
-
-- **Select exactly the text you need** — long-press any chat message to open a
-  selectable-text dialog, then copy part or all of the message. The dialog is
-  readable in light and dark themes and localised in all nine shipped languages.
-
-## What's new in v2.1.12
-
-- **Per-app language selection** — Android 13 and newer now list all nine
-  shipped Hermes locales in the system's app-language settings.
-- **Accurate idle sessions** — unended chats no longer remain permanently
-  active when the Gateway omits a liveness flag; Projects placeholders are
-  ignored and recent activity gets a bounded five-minute window.
-
-## What's new in v2.1.11
-
-- **Eight new languages** — the app is now localised in Japanese, Simplified
-  Chinese, Korean, Spanish, French, German, Brazilian Portuguese, and Russian.
-- **Reliable locale behaviour** — unsupported locales fall back to English,
-  Russian counts use the correct plural forms, and Chinese and Portuguese
-  region variants do not receive an incompatible catalogue.
-
-## What's new in v2.1.10
-
-- **Existing chats stay on target** — sending from a server-listed chat now
-  continues that exact session instead of creating a new sibling session.
-- **Single creation path for new chats** — local drafts use recovery v2 without
-  racing a second legacy session creation, while explicit fallback remains safe.
-
-## What's new in v2.1.9
-
-- **Interactive Gateway requests on Android** — clarification, approval, sudo,
-  and secret prompts now reach the phone during a running turn and recover
-  safely across reconnects.
-- **Fast, safe large-chat restore** — large sessions load a bounded recent
-  transcript without blocking the composer, then reconcile authoritative
-  history without losing newer turns.
-- **Accurate session status** — Android now uses the Gateway's explicit active
-  state instead of treating every unended session as still running.
-
-## What's new in v2.1.8
-
-v2.1.8 fixes two connection-lifecycle problems diagnosed and resolved by
-[@igitur](https://github.com/igitur) in PRs #111 and #113.
-
-- **Custom HTTPS ports work as entered** — an explicit Port field value is
-  honoured even when it is `8642`; leaving the field blank still infers `443`
-  for HTTPS and `8642` for HTTP.
-- **Turns survive leaving the chat** — navigating away during a running turn no
-  longer closes its SSE connection and interrupts the work server-side. The
-  detached client is released after completion, failure, cancellation, or its
-  safety timeout.
-
-## What's new in v2.1.7
-
-v2.1.7 brings the Android daily-driver workspace into line with stock Hermes
-gateways through the extensive compatibility work contributed by
-[@Thaeland](https://github.com/Thaeland) in PR #106.
-
-- **Reliable detached replies** — interrupted socket connections now resume the
-  stored session, keep retrying across long-running turns and app backgrounding,
-  and use durable message IDs so replies are recovered even when the server's
-  capped history window rolls over.
-- **Stock Projects support** — new Projects receive safely provisioned folders,
-  chat moves use the stock `session.workspace.move` contract, and project labels,
-  archived chats, migration, search, and compatibility states follow the real
-  gateway wire shapes.
-- **Correct session pagination** — pinned-session backfills can no longer skip,
-  duplicate, or prematurely end later pages. Mutable OFFSET scans no longer
-  delete local assignments they cannot prove are stale.
-- **Safer transport and offline state** — stale runtime bindings reattach,
-  socket creation and authentication are single-flight, network requests are
-  bounded, and concurrent Project mutations cannot persist optimistic or stale
-  cache snapshots.
-- **Additional resilience** — archived reads are profile-scoped and complete,
-  machine sessions stay out of human chat lists, deliberate reconnects are
-  explained, and Android can discover installed speech-recognition services.
-
-## What's new in v2.1.6
-
-- **Private gateway certificates** — Android now trusts certificate authorities
-  that the device user explicitly installed, so private Caddy and Tailscale
-  gateway endpoints can connect without weakening normal certificate checks
-  (#108).
-
-## What's new in v2.1.0
-
-v2.1.0 merges the community daily-driver workspace edition from
-[@CarlosReyesPena](https://github.com/CarlosReyesPena) (PR #88): a new
-Workspace home with Projects, Chats and Activity panes, server-backed session
-search, config backup and restore, and quick-chat intents — plus a large
-accompanying test suite (900+ tests).
-
-- **Workspace shell** — a new Home with attention-ranked "needs you" digest,
-  global New (project or quick) chat button, Activity operational timeline of
-  gateway turns, and a More pane that routes Cron, Skills, Memory, Settings
-  and the Hermes dashboard.
-- **Projects pane** — server-owned Hermes projects via the gateway
-  `projects.*` RPC family: project tree overview, per-project chats,
-  migration preview and write path for local Spaces, chat moves between
-  projects, per-project search, and safe deletion. Legacy gateways degrade
-  gracefully to a labelled local-only compatibility mode.
-- **Chats browser** — All / Recent / Unassigned / Archived filters, date
-  grouping, running/done status, pinned and archived session flags, and a
-  session→project label fallback for older APIs.
-- **Session search** — three selectable modes: on-device (default), full-text
-  via the dashboard FTS5 endpoint with matching-excerpt results, and
-  AI-assisted query rewriting through Hermes (requires the corresponding
-  server support). Mode is remembered per connection; provider API keys never
-  leave the server.
-- **Configuration backup & restore** — export all connections and app
-  preferences to a single encrypted file (PBKDF2 + AES-256-GCM), import in
-  merge or replace mode, with restore reachable from the empty-connection
-  state before any server is configured.
-- **Quick chat lifecycle** — share-target and app-shortcut entry points,
-  share/review sheets for text and files, and a 72-hour quick-chat archive
-  policy that never archives blocked or running work.
-- **Resilience** — gateway capability discovery (never assume the newest
-  server), fresh TCP per request with a 20 s timeout to fix stale keep-alive
-  hangs, and runtime Android 13+ notification permission request.
-- **Chat UI** — sticky context header (project, model, reasoning effort,
-  connection state), You/Hermes role labels, long-press action sheet, real
-  fenced code blocks with copy and wrap/scroll toggle, and full tool output
-  on expanded activity cards.
-
-## What's new in v2.0.1
-
-- **Background turn notifications** — Android notifications fire when a Desktop
-  Gateway turn completes while the app is backgrounded, mirroring Hermes Desktop
-  tray notification behaviour. Notifications are automatically cleared when you
-  return to the app.
-- **Scroll bug resolved** — the inherited mid-history scroll-jump on session
-  reopen (from upstream PR #71) has been fully resolved. The
-  `ChatScrollCoordinator` only aligns to the end on initial load, never inside
-  the streaming completion handler.
-
-## What's new in v2.0.0
-
-v2.0.0 merges the community Remote Gateway edition from
-[@CristianGCiocoi](https://github.com/CristianGCiocoi).
-
-- **Unified Desktop Gateway JSON-RPC transport** — text, images, and files share
-  one WebSocket session instead of split REST+WebSocket paths.
-- **Per-chat model and thinking-effort selection** without changing the profile
-  default.
-- **Multi-attachment uploads** — up to 10 files per message, 16 MiB each.
-- **Copy/Select, Read Aloud, Edit+Resend, Regenerate, Stop, Export, Search,
-  Rename, Branch, Delete** for conversations.
-- **Native Desktop Gateway event handling** — approvals, sudo, secrets,
-  clarifications, reasoning, tool activity, notifications, background results,
-  reviews, and subagents.
-- **Voice dictation** — stage voice input before explicit send.
-- **Durable turn recovery** — completed gateway responses survive Android
-  process-kill lifecycle events.
-- **Persistent accessible text size** setting.
-- **ATLAS document intake metadata** for mobile uploads.
-- **Secure Android credential storage** with platform key material.
-- **113+ Flutter tests** plus a synthetic gateway contract suite under
-  `tools/fake_gateway/`.
-
-## What's new in v1.0.8
-
-- **Reverse-proxy path prefixes** — configure separate path prefixes for the Gateway API and dashboard, e.g. `/profile/peter` before `/api` and `/v1`, and `/dashboard` before dashboard `/api` routes.
-- **Proxied dashboard mode** — enable **Dashboard behind proxy** when nginx/Caddy/your host injects dashboard authentication. In this mode the app sends clean dashboard requests without trying to scrape a dashboard session token or perform password login.
-- **Prefix-aware validation and chat** — API-key validation, session browsing, existing chat history, streaming chat completions, and dashboard drawer screens all use the configured prefixes.
-
-## What's new in v1.0.7
-
-- **Password-protected dashboards** — the Memory/Cron/Skills/Settings tabs now work against a dashboard secured with basic-auth, not just an open (`--insecure`) one. The app logs in via the dashboard's `/auth/password-login` flow and reuses the session cookie (the same mechanism the desktop client uses).
-- **Configurable dashboard port** — set a custom dashboard port per connection when it isn't the default `9119`.
-- **Dashboard details in the connection flow** — set the dashboard port/username/password while adding a connection (expand **Custom dashboard details**) or later via **⋮ → Dashboard Login**, with validation before saving.
-
-## What's new in v1.0.6
-
-- **Voice chat support** — tap the microphone in chat to dictate a message to Hermes, and Hermes can speak the response back.
-- Spoken replies can be toggled from the chat input bar.
-- Android/iOS microphone and speech-recognition permissions are included.
+- **Faster startup** — the first Flutter frame appears before saved credentials
+  and Android launch intents finish loading; secure migration and recovery
+  still complete before the connected Home screen opens.
+- **Progressive Home and Chats** — Home displays its first five sessions while
+  the full list loads behind a progress bar. Opening Chats early shows available
+  human conversations and the same progress state, adding more as scan pages
+  arrive. After Home has loaded, Chats reuses its complete session list instead
+  of scanning it again. Older blocked work, local pins, and Quick Chat archive
+  records remain available (PR #146).
 
 ## Features
 
@@ -280,19 +124,23 @@ v2.0.0 merges the community Remote Gateway edition from
 
 ## Screenshots
 
+The Home, Chats, More, Cron Jobs and Settings screenshots use anonymised example details.
+
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/01-session-list.jpg" width="220" alt="Session list"><br><sub>Session list</sub></td>
-    <td align="center"><img src="docs/screenshots/02-navigation-drawer.jpg" width="220" alt="Navigation drawer"><br><sub>Navigation drawer</sub></td>
-    <td align="center"><img src="docs/screenshots/03-cron-jobs.jpg" width="220" alt="Cron jobs"><br><sub>Cron jobs</sub></td>
+    <td align="center"><img src="docs/screenshots/00-home.jpg" width="220" alt="Home dashboard with example tasks"><br><sub>Home</sub></td>
+    <td align="center"><img src="docs/screenshots/01-session-list.jpg" width="220" alt="Chats browser with example conversations"><br><sub>Chats</sub></td>
+    <td align="center"><img src="docs/screenshots/02-more.jpg" width="220" alt="More tab with workspace and organisation features"><br><sub>More</sub></td>
   </tr>
   <tr>
+    <td align="center"><img src="docs/screenshots/03-cron-jobs.jpg" width="220" alt="Cron jobs with example schedules"><br><sub>Cron jobs</sub></td>
     <td align="center"><img src="docs/screenshots/04-add-cron-job.jpg" width="220" alt="Add cron job"><br><sub>Add cron job</sub></td>
     <td align="center"><img src="docs/screenshots/05-memory.jpg" width="220" alt="Memory"><br><sub>Memory</sub></td>
-    <td align="center"><img src="docs/screenshots/06-settings.jpg" width="220" alt="Settings"><br><sub>Settings</sub></td>
   </tr>
   <tr>
+    <td align="center"><img src="docs/screenshots/06-settings.jpg" width="220" alt="Settings with an example model and provider"><br><sub>Settings</sub></td>
     <td align="center"><img src="docs/screenshots/07-skills.jpg" width="220" alt="Skills"><br><sub>Skills</sub></td>
+    <td align="center"><img src="docs/screenshots/08-update-available.png" width="220" alt="Update available dialog for Hermes Android v2.1.22"><br><sub>Update available</sub></td>
   </tr>
 </table>
 
@@ -558,6 +406,10 @@ Spoken replies require Google Text-to-Speech to be installed and configured on y
 
 - Browse all Hermes sessions.
 - Tap a session to open its chat.
+- Use a chat's **⋮** menu to **Pin on this device** or **Unpin on this device**.
+  Pinned chats appear first in the Workspace Chats browser and the classic
+  session list. Filters and search still apply, and the pin is only stored in
+  the Android app, not synced to the Hermes server.
 - Pull to refresh the session list.
 - Create a new session from the session list header.
 
@@ -610,7 +462,7 @@ cp build/app/outputs/flutter-apk/app-*-release.apk release-apks/
 block in `android/app/build.gradle.kts` derives per-ABI codes as
 `base * 10 + ABI code` (armeabi-v7a = 1, arm64-v8a = 2, x86_64 = 3), so the
 codes stay ordered armeabi-v7a < arm64-v8a < x86_64 as fdroiddata requires.
-For v2.1.16, base `2156` therefore produces codes `21561`/`21562`/`21563`.
+For v2.1.23, base `2166` therefore produces codes `21661`/`21662`/`21663`.
 CI reads the completed arm64 APK with `aapt` and fails if that relationship
 drifts. Release-floor checks continue to apply to the base value and must not
 be weakened to rely on the ABI code.
@@ -721,6 +573,17 @@ lib/
 
 ## Credits
 
+- **krotname** (Andrei Ovcharenko) — fixed duplicate final answers after
+  Gateway interim previews, including late reasoning and widget regressions
+  (PR #153, v2.1.23). A maintainer follow-up handles exact-match edge cases.
+- **simplaerai-sv** — kept the attachment composer, multiline captions, and
+  Send button usable above the keyboard across narrow, landscape, and
+  large-text layouts, with focused widget regressions in PR #139 (v2.1.18).
+- **dadofsambonzuki** — fixed batch clarification navigation so answering a
+  question does not dismiss the chat or another prompt (PR #145, v2.1.22).
+- **HorCyChangGenitek** — reported and documented the API-only model-picker
+  failure that incorrectly required the Desktop Dashboard on port `9119`
+  (#129). Fixed in v2.1.17.
 - **maebahesioru** — corrected Gateway session liveness handling with focused
   regressions in PR #121 (v2.1.9), added complete Flutter localisation and
   on-device Japanese QA in PR #115 (v2.1.11), then added Android per-app locale
@@ -732,7 +595,10 @@ lib/
   (v2.1.15).
 - **igitur** — diagnosed and fixed explicit HTTPS port handling (PR #111) and
   preserved running Hermes turns when leaving a chat (PR #113), with focused
-  regression coverage for both fixes. Released in v2.1.8.
+  regression coverage for both fixes (v2.1.8). They also added the in-app
+  GitHub release update check, translations, and initial regressions in PR #143
+  (v2.1.20). They contributed Compact chat density and persistent tool-card
+  expansion with widget regressions in PRs #147 and #148 (v2.1.22).
 - **Thaeland** — contributed the extensive stock-gateway compatibility and
   reliability work in PR #106: durable reconnect recovery, Projects and Chats
   wire-contract fixes, safe pagination and folder ownership, transport

@@ -2445,4 +2445,82 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get attached_file => 'Angehängte Datei';
+
+  @override
+  String get pin_on_this_device => 'Auf diesem Gerät anheften';
+
+  @override
+  String get unpin_on_this_device => 'Auf diesem Gerät lösen';
+
+  @override
+  String get pinned_on_this_device => 'Auf diesem Gerät angeheftet';
+
+  @override
+  String get could_not_save_chat_pin =>
+      'Chat konnte auf diesem Gerät nicht angeheftet werden';
+
+  @override
+  String get update_available => 'Update verfügbar';
+
+  @override
+  String get a_newer_hermes_android_build_is_available_on_github =>
+      'Auf GitHub ist ein neueres Hermes-Android-Build verfügbar.';
+
+  @override
+  String get release_notes => 'Versionshinweise';
+
+  @override
+  String get view_release => 'Release ansehen';
+
+  @override
+  String get skip_this_version => 'Diese Version überspringen';
+
+  @override
+  String get later => 'Später';
+
+  @override
+  String get check_for_updates => 'Nach Updates suchen';
+
+  @override
+  String get check_for_updates_on_launch => 'Beim Start nach Updates suchen';
+
+  @override
+  String get you_re_on_the_latest_version =>
+      'Du hast bereits die neueste Version.';
+
+  @override
+  String get couldn_t_check_for_updates =>
+      'Updates konnten nicht geprüft werden.';
+
+  @override
+  String get chat_density => 'Chat-Dichte';
+
+  @override
+  String chat_density_2(Object label) {
+    return 'Chat-Dichte: $label';
+  }
+
+  @override
+  String get chat_density_comfortable => 'Komfortabel';
+
+  @override
+  String get chat_density_compact => 'Kompakt';
+
+  @override
+  String get chat_density_comfortable_description =>
+      'Geräumigere Blasen mit Absenderbeschriftung über jeder Nachricht.';
+
+  @override
+  String get chat_density_compact_description =>
+      'Engere Blasen ohne Beschriftung, damit mehr Nachrichten auf den Bildschirm passen.';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      'Kompakt entfernt die Beschriftungen „You“ und „Hermes“ und verringert Blasenabstand, Abstände und Seitenränder.';
 }

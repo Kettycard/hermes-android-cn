@@ -2444,4 +2444,83 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get attached_file => 'Fichier joint';
+
+  @override
+  String get pin_on_this_device => 'Épingler sur cet appareil';
+
+  @override
+  String get unpin_on_this_device => 'Désépingler sur cet appareil';
+
+  @override
+  String get pinned_on_this_device => 'Épinglés sur cet appareil';
+
+  @override
+  String get could_not_save_chat_pin =>
+      'Impossible d\'enregistrer l\'épinglage sur cet appareil';
+
+  @override
+  String get update_available => 'Mise à jour disponible';
+
+  @override
+  String get a_newer_hermes_android_build_is_available_on_github =>
+      'Une version plus récente de Hermes Android est disponible sur GitHub.';
+
+  @override
+  String get release_notes => 'Notes de version';
+
+  @override
+  String get view_release => 'Voir la version';
+
+  @override
+  String get skip_this_version => 'Ignorer cette version';
+
+  @override
+  String get later => 'Plus tard';
+
+  @override
+  String get check_for_updates => 'Rechercher des mises à jour';
+
+  @override
+  String get check_for_updates_on_launch =>
+      'Rechercher des mises à jour au démarrage';
+
+  @override
+  String get you_re_on_the_latest_version =>
+      'Vous avez déjà la dernière version.';
+
+  @override
+  String get couldn_t_check_for_updates =>
+      'Impossible de rechercher des mises à jour.';
+
+  @override
+  String get chat_density => 'Densité de la conversation';
+
+  @override
+  String chat_density_2(Object label) {
+    return 'Densité de la conversation : $label';
+  }
+
+  @override
+  String get chat_density_comfortable => 'Confortable';
+
+  @override
+  String get chat_density_compact => 'Compacte';
+
+  @override
+  String get chat_density_comfortable_description =>
+      'Bulles plus spacieuses avec une étiquette d’expéditeur au-dessus de chaque message.';
+
+  @override
+  String get chat_density_compact_description =>
+      'Bulles plus serrées et sans étiquette pour afficher plus de messages à l’écran.';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      'Le mode compacte supprime les étiquettes « You » et « Hermes » et réduit les marges internes, l’espacement et les marges latérales des bulles.';
 }

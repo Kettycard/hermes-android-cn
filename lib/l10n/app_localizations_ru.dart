@@ -2445,4 +2445,80 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get attached_file => 'Прикреплённый файл';
+
+  @override
+  String get pin_on_this_device => 'Закрепить на этом устройстве';
+
+  @override
+  String get unpin_on_this_device => 'Открепить на этом устройстве';
+
+  @override
+  String get pinned_on_this_device => 'Закреплено на этом устройстве';
+
+  @override
+  String get could_not_save_chat_pin =>
+      'Не удалось сохранить закрепление чата на этом устройстве';
+
+  @override
+  String get update_available => 'Доступно обновление';
+
+  @override
+  String get a_newer_hermes_android_build_is_available_on_github =>
+      'На GitHub доступна более новая сборка Hermes Android.';
+
+  @override
+  String get release_notes => 'Примечания к выпуску';
+
+  @override
+  String get view_release => 'Открыть выпуск';
+
+  @override
+  String get skip_this_version => 'Пропустить эту версию';
+
+  @override
+  String get later => 'Позже';
+
+  @override
+  String get check_for_updates => 'Проверить обновления';
+
+  @override
+  String get check_for_updates_on_launch => 'Проверять обновления при запуске';
+
+  @override
+  String get you_re_on_the_latest_version => 'У вас уже последняя версия.';
+
+  @override
+  String get couldn_t_check_for_updates => 'Не удалось проверить обновления.';
+
+  @override
+  String get chat_density => 'Плотность чата';
+
+  @override
+  String chat_density_2(Object label) {
+    return 'Плотность чата: $label';
+  }
+
+  @override
+  String get chat_density_comfortable => 'Просторная';
+
+  @override
+  String get chat_density_compact => 'Компактная';
+
+  @override
+  String get chat_density_comfortable_description =>
+      'Более просторные пузыри с подписью отправителя над каждым сообщением.';
+
+  @override
+  String get chat_density_compact_description =>
+      'Более плотные пузыри без подписи — на экран помещается больше сообщений.';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      'Компактный режим убирает подписи You и Hermes и уменьшает внутренние отступы, промежутки и боковые поля пузырей.';
 }

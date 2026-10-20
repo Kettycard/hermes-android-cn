@@ -2440,4 +2440,81 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get attached_file => 'Archivo adjunto';
+
+  @override
+  String get pin_on_this_device => 'Fijar en este dispositivo';
+
+  @override
+  String get unpin_on_this_device => 'Dejar de fijar en este dispositivo';
+
+  @override
+  String get pinned_on_this_device => 'Fijados en este dispositivo';
+
+  @override
+  String get could_not_save_chat_pin =>
+      'No se pudo guardar el chat fijado en este dispositivo';
+
+  @override
+  String get update_available => 'Actualización disponible';
+
+  @override
+  String get a_newer_hermes_android_build_is_available_on_github =>
+      'Hay una compilación más reciente de Hermes Android en GitHub.';
+
+  @override
+  String get release_notes => 'Notas de la versión';
+
+  @override
+  String get view_release => 'Ver la versión';
+
+  @override
+  String get skip_this_version => 'Omitir esta versión';
+
+  @override
+  String get later => 'Más tarde';
+
+  @override
+  String get check_for_updates => 'Buscar actualizaciones';
+
+  @override
+  String get check_for_updates_on_launch => 'Buscar actualizaciones al iniciar';
+
+  @override
+  String get you_re_on_the_latest_version => 'Ya tienes la última versión.';
+
+  @override
+  String get couldn_t_check_for_updates =>
+      'No se pudieron buscar actualizaciones.';
+
+  @override
+  String get chat_density => 'Densidad del chat';
+
+  @override
+  String chat_density_2(Object label) {
+    return 'Densidad del chat: $label';
+  }
+
+  @override
+  String get chat_density_comfortable => 'Cómoda';
+
+  @override
+  String get chat_density_compact => 'Compacta';
+
+  @override
+  String get chat_density_comfortable_description =>
+      'Burbujas más amplias con una etiqueta de remitente sobre cada mensaje.';
+
+  @override
+  String get chat_density_compact_description =>
+      'Burbujas más ajustadas y sin etiqueta para que quepan más mensajes en pantalla.';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      'Compacta quita las etiquetas «You» y «Hermes» y reduce el relleno, el espaciado y los márgenes laterales de las burbujas.';
 }

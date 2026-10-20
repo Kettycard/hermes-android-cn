@@ -2359,6 +2359,79 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get attached_file => '已附加文件';
+
+  @override
+  String get pin_on_this_device => '在此设备上置顶';
+
+  @override
+  String get unpin_on_this_device => '在此设备上取消置顶';
+
+  @override
+  String get pinned_on_this_device => '在此设备上置顶的聊天';
+
+  @override
+  String get could_not_save_chat_pin => '无法在此设备上保存聊天置顶';
+
+  @override
+  String get update_available => '有可用更新';
+
+  @override
+  String get a_newer_hermes_android_build_is_available_on_github =>
+      'GitHub 上已有更新的 Hermes Android 版本。';
+
+  @override
+  String get release_notes => '发行说明';
+
+  @override
+  String get view_release => '查看发行版';
+
+  @override
+  String get skip_this_version => '跳过此版本';
+
+  @override
+  String get later => '稍后';
+
+  @override
+  String get check_for_updates => '检查更新';
+
+  @override
+  String get check_for_updates_on_launch => '启动时检查更新';
+
+  @override
+  String get you_re_on_the_latest_version => '已是最新版本。';
+
+  @override
+  String get couldn_t_check_for_updates => '无法检查更新。';
+
+  @override
+  String get chat_density => '聊天密度';
+
+  @override
+  String chat_density_2(Object label) {
+    return '聊天密度：$label';
+  }
+
+  @override
+  String get chat_density_comfortable => '舒适';
+
+  @override
+  String get chat_density_compact => '紧凑';
+
+  @override
+  String get chat_density_comfortable_description => '每条消息上方带有发送者标签的更宽松气泡。';
+
+  @override
+  String get chat_density_compact_description => '更紧凑的无标签气泡，屏幕上可以显示更多消息。';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      '紧凑模式会去掉 You 和 Hermes 标签，并缩小气泡内边距、间距和两侧边距。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -4710,4 +4783,77 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get attached_file => '已附加文件';
+
+  @override
+  String get pin_on_this_device => '在此设备上置顶';
+
+  @override
+  String get unpin_on_this_device => '在此设备上取消置顶';
+
+  @override
+  String get pinned_on_this_device => '在此设备上置顶的聊天';
+
+  @override
+  String get could_not_save_chat_pin => '无法在此设备上保存聊天置顶';
+
+  @override
+  String get update_available => '有可用更新';
+
+  @override
+  String get a_newer_hermes_android_build_is_available_on_github =>
+      'GitHub 上已有更新的 Hermes Android 版本。';
+
+  @override
+  String get release_notes => '发行说明';
+
+  @override
+  String get view_release => '查看发行版';
+
+  @override
+  String get skip_this_version => '跳过此版本';
+
+  @override
+  String get later => '稍后';
+
+  @override
+  String get check_for_updates => '检查更新';
+
+  @override
+  String get check_for_updates_on_launch => '启动时检查更新';
+
+  @override
+  String get you_re_on_the_latest_version => '已是最新版本。';
+
+  @override
+  String get couldn_t_check_for_updates => '无法检查更新。';
+
+  @override
+  String get chat_density => '聊天密度';
+
+  @override
+  String chat_density_2(Object label) {
+    return '聊天密度：$label';
+  }
+
+  @override
+  String get chat_density_comfortable => '舒适';
+
+  @override
+  String get chat_density_compact => '紧凑';
+
+  @override
+  String get chat_density_comfortable_description => '每条消息上方带有发送者标签的更宽松气泡。';
+
+  @override
+  String get chat_density_compact_description => '更紧凑的无标签气泡，屏幕上可以显示更多消息。';
+
+  @override
+  String chat_density_label_description(Object description, Object label) {
+    return '$label — $description';
+  }
+
+  @override
+  String
+  get compact_removes_the_you_and_hermes_labels_and_trims_bubble_padding_spacing_and_side_margins =>
+      '紧凑模式会去掉 You 和 Hermes 标签，并缩小气泡内边距、间距和两侧边距。';
 }

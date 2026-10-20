@@ -1,8 +1,144 @@
 # Changelog
 
-All notable changes to this project are documented here. This project adheres to
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html). Release notes for
-versions prior to 1.0.7 are in the **What's new** sections of the [README](README.md).
+All notable changes since v1.0.7 are documented here. This project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html). The [README](README.md)
+shows only the three latest releases.
+
+## [2.1.23] - 2026-10-20
+
+### Fixed
+
+- A final Gateway answer that was already previewed no longer appears as a
+  duplicate assistant bubble. Completion reconciles against the matching
+  interim in the current turn; distinct commentary and late reasoning remain
+  visible (PR #153).
+
+### Thanks
+
+- [@krotname](https://github.com/krotname) (Andrei Ovcharenko) for the
+  previewed-completion fix and widget regressions in PR #153. A maintainer
+  follow-up added exact-match reconciliation and further edge-case tests while
+  preserving the contributor's commits.
+
+## [2.1.22] - 2026-10-19
+
+### Added
+
+- Settings → Appearance now offers a Compact chat density that reduces bubble
+  spacing and hides visual sender labels while preserving screen-reader speaker
+  announcements. The choice updates open chats immediately, survives backup
+  restore and remains available when the dashboard is offline (PR #147).
+
+### Fixed
+
+- Tool activity cards now respect a user's collapsed or expanded choice while
+  more tools run, even when the card moves in the chat list or history pages
+  change (PR #148).
+- Answering one question in a batch clarification no longer closes the chat or
+  the next question; cancellation and overlapping approval dialogs also leave
+  the correct route open (PR #145).
+
+### Thanks
+
+- [@igitur](https://github.com/igitur) (Francois Botha) for Compact chat
+  density and persistent tool-card expansion, with widget regressions in PRs
+  #147 and #148.
+- [@dadofsambonzuki](https://github.com/dadofsambonzuki) (Nathan Day) for
+  diagnosing and fixing batch clarification navigation in PR #145.
+- Maintainer follow-up commits addressed additional accessibility, identity,
+  and overlapping-dialog edge cases while preserving contributor commits.
+
+## [2.1.21] - 2026-10-19 — Optimisation Release
+
+### Changed
+
+- The first Flutter frame no longer waits for saved preferences, Android
+  Keystore reads, or initial intent probes. Secure credential migration and
+  share/Quick Chat intents still complete before entering Home.
+- Home displays its first five sessions with a progress bar while the full
+  list loads. Chats shows a provisional human-chat list when opened early,
+  fills it from the same background scan, and reuses Home's complete list when
+  available instead of starting another full scan (PR #146).
+
+### Fixed
+
+- Incomplete or shifting session pages no longer prune device-local Quick Chat
+  archive records. Older blocked work and local pins remain reachable after
+  the full scan.
+
+### Thanks
+
+- [@rusty4444](https://github.com/rusty4444) for testing the prereleases on
+  Android and identifying the early Chats transition. Implementation was
+  assisted by Hermes Agent.
+
+## [2.1.20] - 2026-10-18
+
+### Added
+
+- Ordinary launches check GitHub Releases for a newer Hermes Android APK no
+  more than once every 12 hours after an answered check. Offline attempts may
+  retry next launch. The advisory prompt opens the release in a browser;
+  it does not download or install anything. Shares, Quick Chat shortcuts, and
+  another screen opened before a slow check completes are not interrupted.
+- Settings → About offers a manual update check and an opt-out for launch
+  checks. **Later** prompts again on the next launch, while **Skip this
+  version** waits until a newer release. Both preferences are included in app
+  backups.
+
+### Fixed
+
+- A `304 Not Modified` response now compares the cached validated release
+  against the installed version instead of incorrectly claiming the app is
+  current. Update controls remain available when dashboard settings cannot
+  load; remote images in release notes no longer fetch third-party URLs.
+
+### Thanks
+
+- [@igitur](https://github.com/igitur) (Francois Botha) for the update-check
+  implementation, translations, and initial regressions in PR #143.
+
+## [2.1.19] - 2026-10-12
+
+### Added
+
+- Android-only chat pins now keep chosen conversations above the Chats browser
+  and classic session list. Pins are per connection, survive app restarts and
+  compression continuations, and travel with app backups without changing the
+  Gateway's server-side pinned flag or other clients. Filters and search still
+  apply (PR #140).
+
+### Thanks
+
+- No external contributors in this patch.
+
+## [2.1.18] - 2026-10-12
+
+### Fixed
+
+- Multiline captions, multiple attachment drafts, large text, gateway notices,
+  and the on-screen keyboard no longer push the chat editor or Send button
+  below the visible viewport. Composer extras scroll before the fixed controls,
+  including in narrow landscape and unusually short layouts (PR #139).
+
+### Thanks
+
+- @simplaerai-sv for the responsive composer implementation and regression
+  coverage across portrait, landscape, narrow-screen, and large-text layouts.
+
+## [2.1.17] - 2026-10-11
+
+### Fixed
+
+- The model picker now works on API-server-only connections over port `8642`
+  without requiring the Desktop Dashboard on port `9119`. The selected provider
+  and model are applied to subsequent chat turns while preserving the current
+  session and normal automatic chat titles (#129, PR #138).
+
+### Thanks
+
+- @HorCyChangGenitek for the detailed API-only reproduction that identified the
+  model picker's unintended Dashboard dependency (#129).
 
 ## [2.1.16] - 2026-10-10
 

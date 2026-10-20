@@ -33,7 +33,7 @@ void main() {
   testWidgets('completed tool activity is collapsed with a compact summary', (
     tester,
   ) async {
-    await _pump(tester, const [
+    await _pump(tester, [
       GatewayToolActivity(
         name: 'terminal',
         phase: GatewayToolActivityPhase.completed,
@@ -54,7 +54,7 @@ void main() {
   });
 
   testWidgets('running activity opens automatically', (tester) async {
-    await _pump(tester, const [
+    await _pump(tester, [
       GatewayToolActivity(
         name: 'browser_navigate',
         phase: GatewayToolActivityPhase.running,
@@ -69,7 +69,7 @@ void main() {
   testWidgets('failure summary is urgent and includes duration', (
     tester,
   ) async {
-    await _pump(tester, const [
+    await _pump(tester, [
       GatewayToolActivity(
         name: 'terminal',
         phase: GatewayToolActivityPhase.failed,
@@ -91,14 +91,14 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         theme: hermesTheme(Brightness.dark),
         home: MediaQuery(
           data: const MediaQueryData(textScaler: TextScaler.linear(1.8)),
           child: Scaffold(
             body: ListView(
-              children: const [
+              children: [
                 GatewayActivityCard(
                   activities: [
                     GatewayToolActivity(

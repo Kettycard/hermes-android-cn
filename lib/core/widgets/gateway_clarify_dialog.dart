@@ -3,15 +3,30 @@ import 'package:flutter/material.dart';
 import '../models/gateway_clarify.dart';
 
 import 'package:hermes_android/core/l10n/l10n.dart';
+
 typedef ClarifyResponder = Future<void> Function(String answer);
+
+/// Whether the card may still close the route it was opened in.
+///
+/// A gateway `request.cancel` closes the card itself while an answer is in
+/// flight, and the screen that opened the card may have opened the next
+/// question's card by the time [ClarifyResponder] completes. Popping then
+/// closes whatever route is on top instead — the chat screen, or the next
+/// question — so the card asks before it pops.
+typedef ClarifyRouteOwner = bool Function();
 
 class GatewayClarifyDialog extends StatefulWidget {
   final GatewayClarifyRequest request;
   final ClarifyResponder onRespond;
 
+  /// Defaults to owning the route: a card mounted as a route of its own
+  /// (tests, a single-question prompt) closes itself.
+  final ClarifyRouteOwner? canCloseRoute;
+
   const GatewayClarifyDialog({
     required this.request,
     required this.onRespond,
+    this.canCloseRoute,
     super.key,
   });
 
@@ -71,12 +86,27 @@ class _GatewayClarifyDialogState extends State<GatewayClarifyDialog> {
     });
     try {
       await widget.onRespond(answer);
-      if (mounted) Navigator.of(context).pop(true);
+      // The answer may have been sent while the gateway cancelled the request:
+      // the cancellation closes this card's route, and the screen may already
+      // have opened the next question's card. Popping then would close a route
+      // this card no longer owns.
+      if (mounted && (widget.canCloseRoute?.call() ?? true)) {
+        final route = ModalRoute.of<bool>(context)!;
+        final navigator = Navigator.of(context);
+        if (route.isCurrent) {
+          navigator.pop(true);
+        } else {
+          // An approval can open above clarify while clarify.lock is pending.
+          // A normal pop would close that approval, not this answered card.
+          navigator.removeRoute(route, true);
+        }
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = context.l10n.hermes_could_not_accept_the_answer_please_try_again;
+        _error =
+            context.l10n.hermes_could_not_accept_the_answer_please_try_again;
       });
     }
   }
