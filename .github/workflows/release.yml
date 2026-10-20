@@ -1,9 +1,9 @@
 name: Release
 
+# 本 fork 使用独立的简体中文构建工作流（build-apk.yml）。
+# 上游 Release 工作流校验生产签名与 v<versionName> 标签，与 -zh 标签不兼容，
+# 故在此仅保留手动触发，避免每次发版都出现必然失败的红叉。
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 permissions:
